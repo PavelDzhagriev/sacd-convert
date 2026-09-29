@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import re
 import shutil
+import struct
 import threading
 import uuid
 from pathlib import Path
@@ -106,6 +107,8 @@ def build_ffmpeg_cmd(
         "-hide_banner",
         "-i",
         str(src),
+        "-map",
+        "0:a:0",
         "-af",
         ",".join(filters),
     ]
@@ -127,9 +130,9 @@ def _codec_args(settings: EncodeSettings) -> list[str]:
         return ["-c:a", "libmp3lame", "-b:a", f"{settings.bitrate}k", "-id3v2_version", "3"]
     args = ["-c:a", "flac", "-compression_level", str(settings.compression)]
     if settings.bits == 24:
-        args.extend(["-sample_fmt", "s32", "-bits_per_raw_sample", "24"])
+        args.extend(["-sample_fmt:a", "s32", "-bits_per_raw_sample:a", "24"])
     else:
-        args.extend(["-sample_fmt", "s16"])
+        args.extend(["-sample_fmt:a", "s16"])
     return args
 
 
@@ -234,6 +237,8 @@ def _encode(
         "isrc": track.isrc,
         "comment": f"{'SACD ISO' if disc.kind == 'iso' else 'DSF'} → PCM {settings.label}, Кедр",
     }
+    if src.suffix.lower() == ".dsf":
+        _relax_dsf_layout(src)
     cmd = build_ffmpeg_cmd(src, dst, settings, metadata)
     duration = track.duration_seconds
 
@@ -263,12 +268,72 @@ _NOISE = (
     "program terminates",
 )
 
+# Последняя строка ffmpeg всегда «Conversion failed!». В ней нет причины.
+_GENERIC = (
+    "conversion failed",
+    "error opening input file",
+    "error opening output file",
+    "error while opening encoder",
+    "error initializing output stream",
+    "error while filtering",
+    "error reinitializing filters",
+    "error while processing",
+    "error during demuxing",
+    "error during encoding",
+    "error during decoding",
+)
+
+_CLUE = (
+    "error",
+    "invalid",
+    "mismatch",
+    "not found",
+    "unrecognized",
+    "cannot",
+    "can't",
+    "failed",
+    "not possible",
+    "out of range",
+)
+
+# Тип канала в DSF → число каналов, как его ждёт ffmpeg 7+.
+_DSF_TYPE_CHANNELS = {1: 1, 2: 2, 3: 3, 4: 4, 5: 4, 6: 5, 7: 6}
+
 
 def _interesting_error(tail: list[str]) -> str:
-    for line in reversed(tail):
-        lowered = line.lower()
-        if any(noise in lowered for noise in _NOISE):
+    specific: list[str] = []
+    leftover: list[str] = []
+    for line in tail:
+        lowered = line.lower().strip()
+        if not lowered or any(noise in lowered for noise in _NOISE):
             continue
-        if any(word in lowered for word in ("error", "can't", "cannot", "failed")):
-            return line[:240]
-    return ""
+        if lowered.startswith(("out_time", "bitrate=", "total_size=", "progress=", "speed=", "dup_frames=", "drop_frames=")):
+            continue
+        if any(generic in lowered for generic in _GENERIC):
+            continue
+        leftover.append(line)
+        if any(clue in lowered for clue in _CLUE):
+            specific.append(line)
+    chosen = specific[-1] if specific else (leftover[-1] if leftover else "")
+    return chosen[:240]
+
+
+def _relax_dsf_layout(path: Path) -> None:
+    """ffmpeg 9 не открывает DSF, если тип канала не сходится с их числом.
+
+    sacd_extract так пишет часть многоканальных зон. Тип 0 значит «как в счётчике».
+    """
+    try:
+        data = bytearray(path.read_bytes()[:80])
+    except OSError:
+        return
+    if len(data) < 56 or data[:4] != b"DSD " or data[28:32] != b"fmt ":
+        return
+    channel_type, channels = struct.unpack_from("<II", data, 48)
+    expected = _DSF_TYPE_CHANNELS.get(channel_type)
+    if expected is None or expected == channels or channels <= 0:
+        return
+    struct.pack_into("<I", data, 48, 0)
+    with path.open("r+b") as handle:
+        handle.seek(48)
+        handle.write(data[48:52])

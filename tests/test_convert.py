@@ -9,7 +9,7 @@ from pathlib import Path
 from unittest.mock import patch
 
 from kedr.models import Area, Disc, EncodeSettings, KedrError, Track
-from kedr.pipeline import build_ffmpeg_cmd, convert
+from kedr.pipeline import _interesting_error, _relax_dsf_layout, build_ffmpeg_cmd, convert
 from kedr.probe import probe
 from kedr.server import KedrServer
 from kedr.jobs import JobStore
@@ -55,7 +55,8 @@ class ConvertTests(unittest.TestCase):
         )
         text = " ".join(cmd)
         self.assertIn("aresample=", text)
-        self.assertIn("bits_per_raw_sample", text)
+        self.assertIn("bits_per_raw_sample:a", text)
+        self.assertIn("-map 0:a:0", text)
         self.assertIn("title=Весна", text)
 
     def test_bad_iso_is_explained(self) -> None:
@@ -179,6 +180,31 @@ class ConvertTests(unittest.TestCase):
                     mode="multi",
                 )
         self.assertIn("FLAC", str(caught.exception))
+
+    def test_ffmpeg_trailer_is_not_the_reason(self) -> None:
+        text = _interesting_error(
+            [
+                "[in#0] Channel count mismatch",
+                "Error opening input file x.dsf.",
+                "Conversion failed!",
+            ]
+        )
+        self.assertIn("mismatch", text)
+
+    def test_dsf_channel_type_cleared_when_it_disagrees(self) -> None:
+        import struct
+
+        source = self.root / "layout.dsf"
+        write_tone_dsf(source, seconds=0.05, frequency=440)
+        data = bytearray(source.read_bytes())
+        struct.pack_into("<I", data, 52, 6)
+        source.write_bytes(data)
+        _relax_dsf_layout(source)
+        channel_type, channels = struct.unpack_from("<II", source.read_bytes(), 48)
+        self.assertEqual(channel_type, 0)
+        self.assertEqual(channels, 6)
+        _relax_dsf_layout(source)
+        self.assertEqual(struct.unpack_from("<I", source.read_bytes(), 48)[0], 0)
 
 
 def _json(url: str, payload: dict | None = None) -> dict:
