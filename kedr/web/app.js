@@ -283,7 +283,7 @@ function renderJob(job) {
   renderTracks(job);
   if (job.status === "done") {
     done.hidden = false;
-    $("done-text").textContent = `Готово, ${job.files.length} файл(ов). ${job.output_dir}`;
+    $("done-text").textContent = `Готово, ${filesLabel(job.files.length)}. ${job.output_dir}`;
     done.dataset.path = job.output_dir;
     notice("");
   } else if (job.status === "error") {
@@ -428,6 +428,15 @@ function refreshEstimate() {
   $("estimate").textContent = seconds
     ? `Около ${formatBytes(bytes)} на ${chosen.length} дор. Оценка до сжатия FLAC, с запасом.`
     : "";
+}
+
+function filesLabel(count) {
+  const mod100 = Math.abs(count) % 100;
+  const mod10 = mod100 % 10;
+  if (mod100 > 10 && mod100 < 20) return `${count} файлов`;
+  if (mod10 === 1) return `${count} файл`;
+  if (mod10 >= 2 && mod10 <= 4) return `${count} файла`;
+  return `${count} файлов`;
 }
 
 function formatDuration(seconds) {

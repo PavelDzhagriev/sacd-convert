@@ -280,10 +280,10 @@ legend { margin-bottom: 8px; color: var(--muted); }
 footer { margin-top: 22px; max-width: 68ch; }
 
 @media (max-width: 860px) {
-  .layout, .top, .done, .panel-head.split { display: grid; }
-  .top, .done, .panel-head.split { justify-content: stretch; }
+  .layout { grid-template-columns: 1fr; }
+  .top, .done, .panel-head.split { display: grid; justify-content: stretch; }
   .health { text-align: left; max-width: none; }
   .shell { width: min(1120px, calc(100% - 20px)); }
-  .track { grid-template-columns: 22px 32px minmax(0, 1fr); }
+  .track { grid-template-columns: 22px 32px minmax(0, 1fr) auto; }
   .track .time { display: none; }
 }
