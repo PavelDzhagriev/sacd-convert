@@ -133,6 +133,7 @@ h2 {
 }
 
 .field { display: grid; gap: 8px; margin-top: 14px; }
+[hidden] { display: none !important; }
 .field span { color: var(--muted); font-size: 0.92rem; }
 .field strong { color: var(--ink); font-weight: 650; }
 
