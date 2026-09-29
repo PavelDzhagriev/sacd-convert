@@ -122,6 +122,28 @@ class ProcSlot:
             kill_group(proc)
 
 
+def ffmpeg_has_lame() -> bool:
+    global _LAME
+    if _LAME is not None:
+        return _LAME
+    try:
+        completed = subprocess.run(
+            [str(ffmpeg_path()), "-hide_banner", "-encoders"],
+            check=False,
+            capture_output=True,
+            text=True,
+            timeout=8,
+        )
+    except (OSError, subprocess.TimeoutExpired, KedrError):
+        _LAME = False
+        return False
+    _LAME = "libmp3lame" in (completed.stdout or "")
+    return _LAME
+
+
+_LAME: bool | None = None
+
+
 def ffmpeg_has_soxr() -> bool:
     global _SOXR
     if _SOXR is not None:

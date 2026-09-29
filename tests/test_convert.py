@@ -6,8 +6,9 @@ import threading
 import unittest
 import urllib.request
 from pathlib import Path
+from unittest.mock import patch
 
-from kedr.models import EncodeSettings, KedrError
+from kedr.models import Area, Disc, EncodeSettings, KedrError, Track
 from kedr.pipeline import build_ffmpeg_cmd, convert
 from kedr.probe import probe
 from kedr.server import KedrServer
@@ -115,6 +116,69 @@ class ConvertTests(unittest.TestCase):
         self.assertTrue(flac.is_file())
         info = _probe(flac)
         self.assertEqual(int(info["streams"][0]["sample_rate"]), 88200)
+
+    def test_mp3_rejects_hires_rate(self) -> None:
+        settings = EncodeSettings(format="mp3", rate=176400, lowpass=20000, bitrate=320)
+        with self.assertRaises(KedrError) as caught:
+            settings.validate()
+        self.assertIn("44,1", str(caught.exception))
+
+    def test_mp3_command_uses_lame(self) -> None:
+        if shutil.which("ffmpeg") is None:
+            self.skipTest("ffmpeg is not installed")
+        cmd = build_ffmpeg_cmd(
+            Path("in.dsf"),
+            Path("out.mp3"),
+            EncodeSettings(format="mp3", rate=44100, lowpass=20000, bitrate=320),
+            {"title": "Весна"},
+        )
+        text = " ".join(cmd)
+        self.assertIn("libmp3lame", text)
+        self.assertIn("-b:a 320k", text)
+        self.assertIn("osr=44100", text)
+        self.assertNotIn("bits_per_raw_sample", text)
+
+    def test_dsf_becomes_mp3(self) -> None:
+        if shutil.which("ffmpeg") is None:
+            self.skipTest("ffmpeg is not installed")
+        source = self.root / "tone.dsf"
+        write_tone_dsf(source, seconds=0.2, frequency=440)
+        _folder, files = convert(
+            str(source),
+            str(self.root / "albums"),
+            EncodeSettings(format="mp3", rate=44100, lowpass=20000, bitrate=320),
+        )
+        self.assertEqual(files[0].suffix, ".mp3")
+        stream = _probe(files[0])["streams"][0]
+        self.assertEqual(stream["codec_name"], "mp3")
+        self.assertEqual(int(stream["sample_rate"]), 44100)
+        self.assertEqual(int(stream["channels"]), 2)
+
+    def test_mp3_refuses_multichannel(self) -> None:
+        disc = Disc(
+            source="ignored.dsf",
+            kind="dsf",
+            title="Зал",
+            artist="Кедр",
+            areas=[
+                Area(
+                    index=0,
+                    mode="multi",
+                    label="5.1",
+                    channels=6,
+                    tracks=[Track(number=1, title="Зал", duration_seconds=1)],
+                )
+            ],
+        )
+        with patch("kedr.pipeline.probe", return_value=disc):
+            with self.assertRaises(KedrError) as caught:
+                convert(
+                    "ignored.dsf",
+                    str(self.root),
+                    EncodeSettings(format="mp3", rate=44100, lowpass=20000, bitrate=320),
+                    mode="multi",
+                )
+        self.assertIn("FLAC", str(caught.exception))
 
 
 def _json(url: str, payload: dict | None = None) -> dict:

@@ -1,13 +1,28 @@
-const RATES = [
+const FORMATS = [
+  { value: "flac", label: "FLAC" },
+  { value: "mp3", label: "MP3" },
+];
+const FLAC_RATES = [
   { value: 88200, label: "88,2 кГц" },
   { value: 176400, label: "176,4 кГц" },
   { value: 352800, label: "352,8 кГц" },
+];
+const MP3_RATES = [
+  { value: 44100, label: "44,1 кГц" },
+  { value: 48000, label: "48 кГц" },
 ];
 const BITS = [
   { value: 24, label: "24 бит" },
   { value: 16, label: "16 бит" },
 ];
+const BITRATES = [
+  { value: 320, label: "320" },
+  { value: 256, label: "256" },
+  { value: 192, label: "192" },
+  { value: 128, label: "128" },
+];
 const LOWPASS = [
+  { value: 20000, label: "20 кГц" },
   { value: 30000, label: "30 кГц" },
   { value: 40000, label: "40 кГц" },
   { value: 50000, label: "50 кГц" },
@@ -25,9 +40,12 @@ const state = {
   disc: null,
   mode: "stereo",
   selected: new Set(),
+  format: "flac",
   rate: 176400,
   bits: 24,
+  bitrate: 320,
   lowpass: 40000,
+  mp3Encoder: true,
   jobId: null,
   source: null,
   busy: false,
@@ -36,6 +54,12 @@ const state = {
 const $ = (id) => document.getElementById(id);
 
 document.addEventListener("DOMContentLoaded", () => {
+  if (window.kedr) {
+    document.body.classList.add("desktop");
+    if (window.kedr.platform === "darwin") document.body.classList.add("darwin");
+    const eyebrow = document.querySelector(".eyebrow");
+    if (eyebrow) eyebrow.textContent = "Настольное приложение";
+  }
   restoreSettings();
   renderChoices();
   $("compression").addEventListener("input", () => {
@@ -82,7 +106,9 @@ async function loadHealth() {
 }
 
 function renderHealth(data) {
+  state.mp3Encoder = Boolean(data.mp3);
   const node = $("health");
+  renderChoices();
   if (data.ffmpeg.ok && data.sacd_extract.ok) {
     node.textContent = data.soxr
       ? "ffmpeg с SoX и sacd_extract на месте"
@@ -98,9 +124,18 @@ function renderHealth(data) {
 }
 
 function renderChoices() {
-  fillSegment($("rate"), RATES, state.rate, (value) => {
+  snapRate();
+  fillSegment($("format"), FORMATS, state.format, (value) => {
+    state.format = value;
+    snapRate();
+    renderChoices();
+    saveSettings();
+    refreshEstimate();
+    refreshConvert();
+  });
+  fillSegment($("rate"), state.format === "mp3" ? MP3_RATES : FLAC_RATES, state.rate, (value) => {
     state.rate = value;
-    if (state.lowpass && state.lowpass >= state.rate / 2) state.lowpass = 40000;
+    snapLowpass();
     renderChoices();
     saveSettings();
     refreshEstimate();
@@ -110,10 +145,49 @@ function renderChoices() {
     saveSettings();
     refreshEstimate();
   });
+  fillSegment($("bitrate"), BITRATES, state.bitrate, (value) => {
+    state.bitrate = value;
+    saveSettings();
+    refreshEstimate();
+  });
   fillSegment($("lowpass"), LOWPASS, state.lowpass, (value) => {
     state.lowpass = value;
     saveSettings();
   }, (item) => item.value !== 0 && item.value >= state.rate / 2);
+  const mp3 = state.format === "mp3";
+  $("bits-block").hidden = mp3;
+  $("compression-block").hidden = mp3;
+  $("bitrate-block").hidden = !mp3;
+  $("pcm-title").textContent = mp3 ? "MP3" : "FLAC";
+  $("pcm-lead").textContent = mp3
+    ? "LAME, постоянный битрейт. Выше 48 кГц MP3 не бывает."
+    : "Для DSD64 обычно хватает 176,4 кГц и среза на 40 кГц.";
+  const blocked = mp3Blocked();
+  const hint = blocked
+    ? "MP3 не вмещает 5.1. Выберите FLAC или стереозону."
+    : (mp3 && !state.mp3Encoder ? "В ffmpeg нет LAME, MP3 записать не получится." : "");
+  $("format-hint").textContent = hint;
+  $("format-hint").hidden = !hint;
+  refreshConvert();
+}
+
+function snapRate() {
+  const allowed = state.format === "mp3" ? MP3_RATES : FLAC_RATES;
+  if (!allowed.some((item) => item.value === state.rate)) {
+    state.rate = state.format === "mp3" ? 44100 : 176400;
+  }
+  snapLowpass();
+}
+
+function snapLowpass() {
+  if (!state.lowpass || state.lowpass < state.rate / 2) return;
+  const fallback = state.format === "mp3" ? 20000 : 40000;
+  state.lowpass = fallback < state.rate / 2 ? fallback : 0;
+}
+
+function mp3Blocked() {
+  const area = currentArea();
+  return state.format === "mp3" && Boolean(area && area.channels > 2);
 }
 
 function fillSegment(node, items, current, onPick, disabled) {
@@ -132,8 +206,10 @@ function fillSegment(node, items, current, onPick, disabled) {
 
 async function pick(kind) {
   try {
-    const data = await api("/api/dialog", { kind });
-    if (data.cancelled) return;
+    const data = window.kedr
+      ? await window.kedr.pick(kind)
+      : await api("/api/dialog", { kind });
+    if (!data || data.cancelled) return;
     if (data.unavailable) {
       notice(data.message);
       return;
@@ -190,7 +266,7 @@ function renderDisc() {
     node.replaceChildren();
     node.append(line("p", "disc-kicker", "Оглавление"));
     node.append(line("p", "disc-title", "Диск ещё не прочитан"));
-    node.append(line("p", "disc-copy", "Кедр снимет DST с образа, отфильтрует ультразвуковой шум DSD и запишет 24-битный FLAC."));
+    node.append(line("p", "disc-copy", "Кедр снимет DST с образа, отфильтрует ультразвуковой шум DSD и запишет FLAC или MP3."));
     areas.hidden = true;
     return;
   }
@@ -216,6 +292,7 @@ function renderDisc() {
       renderTracks();
       refreshPreview();
       refreshEstimate();
+      renderChoices();
     });
     areas.append(button);
   }
@@ -291,7 +368,7 @@ function renderJob(job) {
     notice(job.error || job.message);
   } else if (job.status === "cancelled") {
     done.hidden = true;
-    notice("Остановлено. Уже записанные FLAC остались в папке.", "ok");
+    notice("Остановлено. Уже записанные файлы остались в папке.", "ok");
   } else {
     done.hidden = true;
   }
@@ -311,8 +388,10 @@ async function startConvert() {
       output_dir: $("out-path").value.trim(),
       mode: area.mode,
       tracks,
+      format: state.format,
       rate: state.rate,
       bits: state.bits,
+      bitrate: state.bitrate,
       lowpass: state.lowpass,
       compression: Number($("compression").value),
     });
@@ -371,6 +450,10 @@ async function revealFolder() {
   const path = $("done").dataset.path;
   if (!path) return;
   try {
+    if (window.kedr) {
+      await window.kedr.reveal(path);
+      return;
+    }
     await api("/api/reveal", { path });
   } catch (error) {
     notice(`${error.message} ${path}`);
@@ -402,10 +485,15 @@ function syncSelectAll() {
 }
 
 function canConvert() {
-  return Boolean(state.disc && $("out-path").value.trim() && state.selected.size && !state.busy);
+  if (!state.disc || !$("out-path").value.trim() || !state.selected.size || state.busy) return false;
+  if (mp3Blocked()) return false;
+  if (state.format === "mp3" && !state.mp3Encoder) return false;
+  return true;
 }
 
 function refreshConvert() {
+  const label = state.format === "mp3" ? "MP3" : "FLAC";
+  $("convert").textContent = `Преобразовать в ${label}`;
   $("convert").disabled = !canConvert();
 }
 
@@ -423,11 +511,18 @@ function refreshEstimate() {
   }
   const chosen = area.tracks.filter((track) => state.selected.has(track.number));
   const seconds = chosen.reduce((sum, track) => sum + track.duration_seconds, 0);
+  if (!seconds) {
+    $("estimate").textContent = "";
+    return;
+  }
+  if (state.format === "mp3") {
+    const bytes = seconds * state.bitrate * 1000 / 8;
+    $("estimate").textContent = `Около ${formatBytes(bytes)} на ${chosen.length} дор. Постоянный битрейт ${state.bitrate} кбит/с.`;
+    return;
+  }
   const channels = area.channels || 2;
   const bytes = seconds * state.rate * (state.bits / 8) * channels * 0.62;
-  $("estimate").textContent = seconds
-    ? `Около ${formatBytes(bytes)} на ${chosen.length} дор. Оценка до сжатия FLAC, с запасом.`
-    : "";
+  $("estimate").textContent = `Около ${formatBytes(bytes)} на ${chosen.length} дор. Оценка до сжатия FLAC, с запасом.`;
 }
 
 function filesLabel(count) {
@@ -471,8 +566,10 @@ function line(tag, className, text) {
 function restoreSettings() {
   try {
     const saved = JSON.parse(localStorage.getItem("kedr-settings") || "{}");
-    if (RATES.some((item) => item.value === saved.rate)) state.rate = saved.rate;
+    if (saved.format === "flac" || saved.format === "mp3") state.format = saved.format;
+    if (typeof saved.rate === "number") state.rate = saved.rate;
     if (BITS.some((item) => item.value === saved.bits)) state.bits = saved.bits;
+    if (BITRATES.some((item) => item.value === saved.bitrate)) state.bitrate = saved.bitrate;
     if (LOWPASS.some((item) => item.value === saved.lowpass)) state.lowpass = saved.lowpass;
     if (Number.isInteger(saved.compression)) {
       $("compression").value = String(saved.compression);
@@ -481,12 +578,15 @@ function restoreSettings() {
   } catch (_error) {
     /* пустые настройки */
   }
+  snapRate();
 }
 
 function saveSettings() {
   localStorage.setItem("kedr-settings", JSON.stringify({
+    format: state.format,
     rate: state.rate,
     bits: state.bits,
+    bitrate: state.bitrate,
     lowpass: state.lowpass,
     compression: Number($("compression").value),
   }));

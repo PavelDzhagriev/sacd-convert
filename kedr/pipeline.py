@@ -9,7 +9,7 @@ from pathlib import Path
 from kedr.models import Area, Cancelled, Disc, EncodeSettings, KedrError, Track
 from kedr.naming import album_dirname, track_filename
 from kedr.probe import probe, resolve_source
-from kedr.tools import ProcSlot, ffmpeg_has_soxr, ffmpeg_path, run_piped, sacd_extract_path
+from kedr.tools import ProcSlot, ffmpeg_has_lame, ffmpeg_has_soxr, ffmpeg_path, run_piped, sacd_extract_path
 
 _COMPLETED = re.compile(r"Completed:\s*(\d+)%")
 _TOTAL = re.compile(r"Total:\s*(\d+)%")
@@ -53,6 +53,8 @@ def convert(
     chosen = _select_tracks(area, track_numbers)
     if not chosen:
         raise KedrError("Не выбрано ни одной дорожки.")
+    if settings.format == "mp3" and area.channels > 2:
+        raise KedrError("MP3 хранит только моно и стерео. Для многоканальной зоны выберите FLAC.")
 
     destination_root = _output_dir(output_dir)
     album_dir = destination_root / album_dirname(disc, area)
@@ -65,12 +67,12 @@ def convert(
     written: list[Path] = []
     try:
         sources = _materialize(disc, area, chosen, work, report, stop, slot)
-        report.phase("encode", "Пишу FLAC")
+        report.phase("encode", f"Пишу {settings.label}")
         for track in chosen:
             if stop.is_set():
                 raise Cancelled()
             src = sources[track.number]
-            target = album_dir / track_filename(track.number, track.title)
+            target = album_dir / track_filename(track.number, track.title, settings.suffix)
             report.track(track.number, "encoding", 0)
             _encode(src, target, disc, area, track, settings, report, stop, slot)
             written.append(target)
@@ -106,15 +108,8 @@ def build_ffmpeg_cmd(
         str(src),
         "-af",
         ",".join(filters),
-        "-c:a",
-        "flac",
-        "-compression_level",
-        str(settings.compression),
     ]
-    if settings.bits == 24:
-        cmd.extend(["-sample_fmt", "s32", "-bits_per_raw_sample", "24"])
-    else:
-        cmd.extend(["-sample_fmt", "s16"])
+    cmd.extend(_codec_args(settings))
     cmd.extend(["-map_metadata", "-1"])
     for key, value in metadata.items():
         if value:
@@ -123,9 +118,24 @@ def build_ffmpeg_cmd(
     return cmd
 
 
+def _codec_args(settings: EncodeSettings) -> list[str]:
+    if settings.format == "mp3":
+        if not ffmpeg_has_lame():
+            raise KedrError(
+                "В ffmpeg нет кодировщика LAME. На Mac: brew reinstall ffmpeg."
+            )
+        return ["-c:a", "libmp3lame", "-b:a", f"{settings.bitrate}k", "-id3v2_version", "3"]
+    args = ["-c:a", "flac", "-compression_level", str(settings.compression)]
+    if settings.bits == 24:
+        args.extend(["-sample_fmt", "s32", "-bits_per_raw_sample", "24"])
+    else:
+        args.extend(["-sample_fmt", "s16"])
+    return args
+
+
 def _output_dir(raw: str) -> Path:
     if not raw or not raw.strip():
-        raise KedrError("Укажите папку, куда сохранить FLAC.")
+        raise KedrError("Укажите папку, куда сохранить файлы.")
     path = Path(raw.strip()).expanduser().resolve()
     if path.exists() and not path.is_dir():
         raise KedrError("Папка назначения оказалась файлом.")
@@ -222,7 +232,7 @@ def _encode(
         "genre": disc.genre,
         "composer": track.composer,
         "isrc": track.isrc,
-        "comment": "SACD ISO → PCM FLAC, Кедр" if disc.kind == "iso" else "DSF → PCM FLAC, Кедр",
+        "comment": f"{'SACD ISO' if disc.kind == 'iso' else 'DSF'} → PCM {settings.label}, Кедр",
     }
     cmd = build_ffmpeg_cmd(src, dst, settings, metadata)
     duration = track.duration_seconds

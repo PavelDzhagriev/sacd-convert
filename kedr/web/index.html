@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Кедр — SACD ISO в FLAC</title>
+  <title>Кедр — SACD в FLAC или MP3</title>
   <link rel="icon" href="/favicon.svg" type="image/svg+xml">
   <link rel="stylesheet" href="/styles.css">
 </head>
@@ -32,7 +32,7 @@
       <section class="panel" aria-labelledby="source-title">
         <div class="panel-head">
           <h2 id="source-title">Образ</h2>
-          <p>SACD ISO или уже извлечённый DSF. FLAC получит PCM, не однобитный поток.</p>
+          <p>SACD ISO или уже извлечённый DSF. На выходе PCM: FLAC без потерь или MP3.</p>
         </div>
         <label class="field">
           <span>Путь к файлу</span>
@@ -45,30 +45,39 @@
         <div id="disc" class="disc empty">
           <p class="disc-kicker">Оглавление</p>
           <p class="disc-title">Диск ещё не прочитан</p>
-          <p class="disc-copy">Кедр снимет DST с образа, отфильтрует ультразвуковой шум DSD и запишет 24-битный FLAC.</p>
+          <p class="disc-copy">Кедр снимет DST с образа, отфильтрует ультразвуковой шум DSD и запишет FLAC или MP3.</p>
         </div>
         <div id="areas" class="segment" hidden></div>
       </section>
 
       <section class="panel" aria-labelledby="pcm-title">
         <div class="panel-head">
-          <h2 id="pcm-title">PCM</h2>
-          <p>Для DSD64 обычно хватает 176,4 кГц и среза на 40 кГц.</p>
+          <h2 id="pcm-title">FLAC</h2>
+          <p id="pcm-lead">Для DSD64 обычно хватает 176,4 кГц и среза на 40 кГц.</p>
         </div>
+        <fieldset>
+          <legend>Формат</legend>
+          <div id="format" class="segment" role="group"></div>
+          <p id="format-hint" class="hint"></p>
+        </fieldset>
         <fieldset>
           <legend>Частота</legend>
           <div id="rate" class="segment" role="group"></div>
         </fieldset>
-        <fieldset>
+        <fieldset id="bits-block">
           <legend>Разрядность</legend>
           <div id="bits" class="segment" role="group"></div>
+        </fieldset>
+        <fieldset id="bitrate-block" hidden>
+          <legend>Битрейт, кбит/с</legend>
+          <div id="bitrate" class="segment" role="group"></div>
         </fieldset>
         <fieldset>
           <legend>Срез шума</legend>
           <div id="lowpass" class="segment" role="group"></div>
-          <p class="hint">Выше 20 кГц у DSD быстро растёт шум. Срез оставляет музыку и не тащит этот шум в FLAC.</p>
+          <p class="hint">Выше 20 кГц у DSD быстро растёт шум. Срез оставляет музыку и не тащит этот шум в файл.</p>
         </fieldset>
-        <label class="field">
+        <label id="compression-block" class="field">
           <span>Сжатие FLAC <strong id="compression-label">8</strong></span>
           <input id="compression" type="range" min="0" max="8" step="1" value="8">
         </label>
@@ -111,7 +120,7 @@
     </section>
 
     <footer>
-      <p>DSD — однобитный поток 2,8 МГц. FLAC хранит PCM, поэтому Кедр декодирует DSD фильтром ffmpeg и, если можно, ресемплером SoX.</p>
+      <p>DSD — однобитный поток 2,8 МГц. И FLAC, и MP3 получают PCM после фильтра ffmpeg. MP3 дополнительно сжимает LAME и не бывает выше 48 кГц.</p>
     </footer>
   </div>
   <script src="/app.js"></script>

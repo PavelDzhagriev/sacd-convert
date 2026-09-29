@@ -33,6 +33,12 @@ button, input { font: inherit; color: inherit; }
 
 button { cursor: pointer; }
 
+body.desktop .top { -webkit-app-region: drag; }
+body.desktop.darwin .brand { margin-left: 72px; }
+body.desktop button,
+body.desktop input,
+body.desktop .segment { -webkit-app-region: no-drag; }
+
 .shell {
   width: min(1120px, calc(100% - 32px));
   margin: 0 auto;

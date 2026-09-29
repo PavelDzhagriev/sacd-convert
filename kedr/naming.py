@@ -22,11 +22,12 @@ def album_dirname(disc: Disc, area: Area) -> str:
     return name
 
 
-def track_filename(number: int, title: str) -> str:
+def track_filename(number: int, title: str, extension: str = "flac") -> str:
+    suffix = extension.lstrip(".").lower() or "flac"
     safe = sanitize(title, "")
     if safe:
-        return f"{number:02d} {safe}.flac"
-    return f"{number:02d}.flac"
+        return f"{number:02d} {safe}.{suffix}"
+    return f"{number:02d}.{suffix}"
 
 
 def format_duration(seconds: float) -> str:

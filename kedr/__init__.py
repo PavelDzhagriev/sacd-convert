@@ -1,3 +1,3 @@
-"""Кедр — локальная утилита: SACD ISO (DSD) в PCM FLAC."""
+"""Кедр — настольная утилита: SACD ISO и DSF в FLAC или MP3."""
 
-__version__ = "1.0.0"
+__version__ = "1.1.0"

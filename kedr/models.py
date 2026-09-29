@@ -101,14 +101,24 @@ class EncodeSettings:
     bits: int = 24
     lowpass: int = 40000
     compression: int = 8
+    format: str = "flac"
+    bitrate: int = 320
 
     def validate(self) -> None:
-        if self.rate not in (88200, 176400, 352800):
-            raise KedrError("Частота дискретизации: 88,2, 176,4 или 352,8 кГц.")
-        if self.bits not in (16, 24):
-            raise KedrError("Разрядность: 16 или 24 бита.")
-        if not 0 <= self.compression <= 8:
-            raise KedrError("Сжатие FLAC — от 0 до 8.")
+        if self.format not in ("flac", "mp3"):
+            raise KedrError("Формат: FLAC или MP3.")
+        if self.format == "flac":
+            if self.rate not in (88200, 176400, 352800):
+                raise KedrError("Для FLAC частота: 88,2, 176,4 или 352,8 кГц.")
+            if self.bits not in (16, 24):
+                raise KedrError("Разрядность FLAC: 16 или 24 бита.")
+            if not 0 <= self.compression <= 8:
+                raise KedrError("Сжатие FLAC — от 0 до 8.")
+        else:
+            if self.rate not in (44100, 48000):
+                raise KedrError("Для MP3 частота 44,1 или 48 кГц. Выше MPEG не хранит.")
+            if self.bitrate not in (128, 192, 256, 320):
+                raise KedrError("Битрейт MP3: 128, 192, 256 или 320 кбит/с.")
         if self.lowpass < 0 or self.lowpass > 80000:
             raise KedrError("Частота среза должна быть от 0 до 80 кГц.")
         if self.lowpass and self.lowpass >= self.rate / 2:
@@ -116,3 +126,11 @@ class EncodeSettings:
                 "Срез выше частоты Найквиста для выбранной дискретизации. "
                 "Уменьшите срез или поднимите частоту."
             )
+
+    @property
+    def suffix(self) -> str:
+        return "mp3" if self.format == "mp3" else "flac"
+
+    @property
+    def label(self) -> str:
+        return "MP3" if self.format == "mp3" else "FLAC"

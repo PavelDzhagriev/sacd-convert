@@ -15,7 +15,8 @@ from kedr.tools import ProcSlot
 
 
 class CliReporter(Reporter):
-    def __init__(self) -> None:
+    def __init__(self, label: str = "FLAC") -> None:
+        self._label = label
         self._extract = -1
         self._encode = ""
 
@@ -35,7 +36,7 @@ class CliReporter(Reporter):
             if label == self._encode:
                 return
             self._encode = label
-            print(f"\rFLAC, дорожка {number}: {int(percent):3d}%", end="", file=sys.stderr, flush=True)
+            print(f"\r{self._label}, дорожка {number}: {int(percent):3d}%", end="", file=sys.stderr, flush=True)
         elif status == "done" and path:
             print(f"\n{path}", file=sys.stderr)
 
@@ -68,7 +69,7 @@ def main(argv: list[str] | None = None) -> int:
 def _parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="kedr",
-        description="Кедр переводит SACD ISO и DSF в PCM FLAC.",
+        description="Кедр переводит SACD ISO и DSF в FLAC или MP3.",
     )
     parser.add_argument("--version", action="version", version=f"Кедр {__version__}")
     commands = parser.add_subparsers(dest="command")
@@ -80,15 +81,17 @@ def _parser() -> argparse.ArgumentParser:
     info = commands.add_parser("info", help="Показать оглавление")
     info.add_argument("source")
 
-    convert_cmd = commands.add_parser("convert", help="Преобразовать в FLAC")
+    convert_cmd = commands.add_parser("convert", help="Преобразовать в FLAC или MP3")
     convert_cmd.add_argument("source")
     convert_cmd.add_argument("-o", "--output", required=True, help="Папка для альбома")
+    convert_cmd.add_argument("--format", choices=("flac", "mp3"), default="flac")
     convert_cmd.add_argument("--mode", choices=("stereo", "multi"), default="stereo")
     convert_cmd.add_argument("--tracks", default="", help="Номера через запятую: 1,2,5")
-    convert_cmd.add_argument("--rate", type=int, default=176400)
+    convert_cmd.add_argument("--rate", type=int, default=None, help="Гц. FLAC: 88200/176400/352800. MP3: 44100/48000")
     convert_cmd.add_argument("--bits", type=int, default=24)
-    convert_cmd.add_argument("--lowpass", type=int, default=40000)
+    convert_cmd.add_argument("--lowpass", type=int, default=None, help="Гц, 0 — без среза")
     convert_cmd.add_argument("--compression", type=int, default=8)
+    convert_cmd.add_argument("--bitrate", type=int, default=320, help="кбит/с для MP3")
 
     commands.add_parser("tools", help="Проверить ffmpeg и sacd_extract")
     return parser
@@ -114,7 +117,16 @@ def _convert(args: argparse.Namespace) -> int:
     numbers = None
     if args.tracks.strip():
         numbers = [int(part) for part in args.tracks.split(",") if part.strip()]
-    settings = EncodeSettings(args.rate, args.bits, args.lowpass, args.compression)
+    rate = args.rate if args.rate is not None else (44100 if args.format == "mp3" else 176400)
+    lowpass = args.lowpass if args.lowpass is not None else (20000 if args.format == "mp3" else 40000)
+    settings = EncodeSettings(
+        rate=rate,
+        bits=args.bits,
+        lowpass=lowpass,
+        compression=args.compression,
+        format=args.format,
+        bitrate=args.bitrate,
+    )
     stop = threading.Event()
     slot = ProcSlot()
 
@@ -129,7 +141,7 @@ def _convert(args: argparse.Namespace) -> int:
         settings,
         mode=args.mode,
         track_numbers=numbers,
-        reporter=CliReporter(),
+        reporter=CliReporter(settings.label),
         stop=stop,
         slot=slot,
     )
@@ -144,6 +156,8 @@ def _tools() -> int:
         state = "есть" if item["ok"] else "нет"
         extra = f"  {item['path']}" if item["ok"] else ""
         print(f"{name}: {state}{extra}")
+    lame = "есть" if report["mp3"] else "нет"
+    print(f"libmp3lame: {lame}")
     if not report["ffmpeg"]["ok"] or not report["sacd_extract"]["ok"]:
         print(report["hint"], file=sys.stderr)
         return 1

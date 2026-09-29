@@ -14,7 +14,7 @@ from kedr.dialogs import DialogUnavailable, choose, reveal
 from kedr.jobs import JobStore, launch
 from kedr.models import EncodeSettings, KedrError
 from kedr.probe import describe, probe
-from kedr.tools import ffmpeg_has_soxr, find_tool, tool_version
+from kedr.tools import ffmpeg_has_lame, ffmpeg_has_soxr, find_tool, tool_version
 
 WEB = Path(__file__).resolve().parent / "web"
 FILES = {
@@ -191,6 +191,7 @@ def health() -> dict:
         "platform": sys.platform,
         "hint": hint,
         "soxr": ffmpeg_has_soxr() if ffmpeg else False,
+        "mp3": ffmpeg_has_lame() if ffmpeg else False,
         "ffmpeg": {
             "ok": ffmpeg is not None,
             "path": str(ffmpeg) if ffmpeg else "",
@@ -202,11 +203,22 @@ def health() -> dict:
 
 
 def _settings(payload: dict) -> EncodeSettings:
+    fmt = str(payload.get("format") or "flac")
+    if fmt not in ("flac", "mp3"):
+        raise KedrError("Формат: FLAC или MP3.")
+    rate = payload.get("rate")
+    lowpass = payload.get("lowpass")
+    if rate is None:
+        rate = 44100 if fmt == "mp3" else 176400
+    if lowpass is None:
+        lowpass = 20000 if fmt == "mp3" else 40000
     return EncodeSettings(
-        rate=int(payload.get("rate") or 176400),
+        rate=int(rate),
         bits=int(payload.get("bits") or 24),
-        lowpass=int(payload.get("lowpass") if payload.get("lowpass") is not None else 40000),
+        lowpass=int(lowpass),
         compression=int(payload.get("compression") if payload.get("compression") is not None else 8),
+        format=fmt,
+        bitrate=int(payload.get("bitrate") or 320),
     )
 
 

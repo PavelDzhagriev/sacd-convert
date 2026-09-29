@@ -15,7 +15,7 @@ if ! command -v brew >/dev/null 2>&1; then
   exit 1
 fi
 
-brew install cmake libxml2 ffmpeg python
+brew install cmake libxml2 ffmpeg python node
 
 if ! python3 -c 'import sys; raise SystemExit(0 if sys.version_info >= (3, 9) else 1)'; then
   echo "Нужен Python 3.9 или новее." >&2
@@ -24,16 +24,11 @@ fi
 
 "$ROOT/scripts/build-sacd-extract.sh"
 python3 "$ROOT/scripts/make_icon.py"
+(cd "$ROOT" && npm install)
 
 APP="$ROOT/dist/Kedr.app"
 rm -rf "$APP"
-mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources/kedr" "$APP/Contents/Resources/bin"
-cp -R "$ROOT/kedr/." "$APP/Contents/Resources/kedr/"
-while IFS= read -r -d '' cached; do
-  rm -rf "$cached"
-done < <(find "$APP/Contents/Resources/kedr" -type d -name __pycache__ -print0)
-cp "$ROOT/bin/sacd_extract" "$APP/Contents/Resources/bin/sacd_extract"
-chmod +x "$APP/Contents/Resources/bin/sacd_extract"
+mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources"
 
 cat > "$APP/Contents/Info.plist" << 'PLIST'
 <?xml version="1.0" encoding="UTF-8"?>
@@ -47,9 +42,9 @@ cat > "$APP/Contents/Info.plist" << 'PLIST'
   <key>CFBundleIdentifier</key>
   <string>local.kedr.dsdflac</string>
   <key>CFBundleVersion</key>
-  <string>1.0.0</string>
+  <string>1.1.0</string>
   <key>CFBundleShortVersionString</key>
-  <string>1.0.0</string>
+  <string>1.1.0</string>
   <key>CFBundleExecutable</key>
   <string>kedr</string>
   <key>CFBundlePackageType</key>
@@ -69,19 +64,19 @@ PLIST
 cat > "$APP/Contents/MacOS/kedr" << EOF
 #!/bin/bash
 export PATH="/opt/homebrew/bin:/usr/local/bin:\$PATH"
-export PYTHONPATH="$APP/Contents/Resources"
-export KEDR_RESOURCES="$APP/Contents/Resources"
-export KEDR_SACD_EXTRACT="$APP/Contents/Resources/bin/sacd_extract"
-cd "$APP/Contents/Resources"
+export PYTHONPATH="$ROOT"
+export KEDR_SACD_EXTRACT="$ROOT/bin/sacd_extract"
+cd "$ROOT"
+ELECTRON="$ROOT/node_modules/.bin/electron"
+if [[ ! -x "\$ELECTRON" ]]; then
+  osascript -e 'display alert "Кедр" message "Не найден Electron. В папке проекта выполните: npm install"'
+  exit 1
+fi
 if ! command -v python3 >/dev/null 2>&1; then
   osascript -e 'display alert "Кедр" message "Нужен Python 3.9 или новее. Установите: brew install python"'
   exit 1
 fi
-if curl -fsS "http://127.0.0.1:47631/api/health" >/dev/null 2>&1; then
-  open "http://127.0.0.1:47631"
-  exit 0
-fi
-exec python3 -m kedr serve --open --port 47631
+exec "\$ELECTRON" "$ROOT"
 EOF
 chmod +x "$APP/Contents/MacOS/kedr"
 
