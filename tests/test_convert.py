@@ -9,7 +9,7 @@ from pathlib import Path
 from unittest.mock import patch
 
 from kedr.models import Area, Disc, EncodeSettings, KedrError, Track
-from kedr.pipeline import _interesting_error, _relax_dsf_layout, build_ffmpeg_cmd, convert
+from kedr.pipeline import _fit_lowpass, _interesting_error, _relax_dsf_layout, build_ffmpeg_cmd, convert
 from kedr.probe import probe
 from kedr.server import KedrServer
 from kedr.jobs import JobStore
@@ -55,6 +55,8 @@ class ConvertTests(unittest.TestCase):
         )
         text = " ".join(cmd)
         self.assertIn("aresample=", text)
+        self.assertIn("precision=20", text)
+        self.assertIn("precision=f64", text)
         self.assertIn("bits_per_raw_sample:a", text)
         self.assertIn("-map 0:a:0", text)
         self.assertIn("title=Весна", text)
@@ -190,6 +192,24 @@ class ConvertTests(unittest.TestCase):
             ]
         )
         self.assertIn("mismatch", text)
+        text = _interesting_error(
+            [
+                "[Parsed_lowpass_0] Invalid frequency and/or width!",
+                "[af#0:0] Terminating thread with return code -22 (Invalid argument)",
+            ]
+        )
+        self.assertIn("frequency", text)
+
+    def test_lowpass_stays_under_pcm_nyquist(self) -> None:
+        import struct
+
+        source = self.root / "rate.dsf"
+        write_tone_dsf(source, seconds=0.05, frequency=440)
+        data = bytearray(source.read_bytes())
+        struct.pack_into("<I", data, 56, 352800)
+        source.write_bytes(data)
+        self.assertLess(_fit_lowpass(40000, source), 22050)
+        self.assertEqual(_fit_lowpass(40000, self.root / "tone-missing.dsf"), 40000)
 
     def test_dsf_channel_type_cleared_when_it_disagrees(self) -> None:
         import struct

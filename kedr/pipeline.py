@@ -5,6 +5,7 @@ import shutil
 import struct
 import threading
 import uuid
+from dataclasses import replace
 from pathlib import Path
 
 from kedr.models import Area, Cancelled, Disc, EncodeSettings, KedrError, Track
@@ -89,14 +90,18 @@ def build_ffmpeg_cmd(
     dst: Path,
     settings: EncodeSettings,
     metadata: dict[str, str],
+    *,
+    use_soxr: bool = True,
 ) -> list[str]:
     filters: list[str] = []
     if settings.lowpass:
-        filters.append(f"lowpass=f={settings.lowpass}:poles=2")
-    if ffmpeg_has_soxr():
+        # f64: целочисленный биквад на 352,8 кГц в ffmpeg 9 иногда отвечает EINVAL.
+        filters.append(f"lowpass=f={settings.lowpass}:poles=2:precision=f64")
+    if use_soxr and ffmpeg_has_soxr():
+        # precision=20 — верхний штатный режим SoX (VHQ). 28 даёт recipe 6, его Homebrew отвергает.
         resample = (
             "aresample="
-            f"resampler=soxr:precision=28:osr={settings.rate}:dither_method=triangular"
+            f"resampler=soxr:precision=20:osr={settings.rate}:dither_method=triangular"
         )
     else:
         resample = f"aresample=osr={settings.rate}:dither_method=triangular"
@@ -239,7 +244,7 @@ def _encode(
     }
     if src.suffix.lower() == ".dsf":
         _relax_dsf_layout(src)
-    cmd = build_ffmpeg_cmd(src, dst, settings, metadata)
+    tuned = replace(settings, lowpass=_fit_lowpass(settings.lowpass, src))
     duration = track.duration_seconds
 
     def on_line(line: str) -> None:
@@ -250,6 +255,38 @@ def _encode(
         elapsed = int(hours) * 3600 + int(minutes) * 60 + float(seconds)
         report.track(track.number, "encoding", min(99, elapsed / duration * 100))
 
+    use_soxr = ffmpeg_has_soxr()
+
+    def attempt(soxr: bool) -> None:
+        try:
+            _run_ffmpeg(src, dst, tuned, metadata, on_line, stop, slot, soxr)
+        except Cancelled:
+            raise
+        except KedrError as exc:
+            raise KedrError(f"Дорожка {track.number}: {exc}") from exc
+
+    try:
+        attempt(use_soxr)
+    except Cancelled:
+        raise
+    except KedrError:
+        if not use_soxr:
+            raise
+        dst.unlink(missing_ok=True)
+        attempt(False)
+
+
+def _run_ffmpeg(
+    src: Path,
+    dst: Path,
+    settings: EncodeSettings,
+    metadata: dict[str, str],
+    on_line,
+    stop: threading.Event,
+    slot: ProcSlot,
+    use_soxr: bool,
+) -> None:
+    cmd = build_ffmpeg_cmd(src, dst, settings, metadata, use_soxr=use_soxr)
     try:
         code, tail = run_piped(cmd, on_line, stop, slot)
     except Cancelled:
@@ -259,7 +296,7 @@ def _encode(
         if dst.exists():
             dst.unlink()
         detail = _interesting_error(tail) or f"ffmpeg завершился с кодом {code}."
-        raise KedrError(f"Дорожка {track.number}: {detail}")
+        raise KedrError(detail)
 
 
 _NOISE = (
@@ -281,6 +318,7 @@ _GENERIC = (
     "error during demuxing",
     "error during encoding",
     "error during decoding",
+    "terminating thread with return code",
 )
 
 _CLUE = (
@@ -316,6 +354,30 @@ def _interesting_error(tail: list[str]) -> str:
             specific.append(line)
     chosen = specific[-1] if specific else (leftover[-1] if leftover else "")
     return chosen[:240]
+
+
+def _pcm_rate(path: Path) -> int | None:
+    """Частота PCM, которую ffmpeg получит из DSF: в заголовке частота DSD, её делят на 8."""
+    try:
+        header = path.read_bytes()[:64]
+    except OSError:
+        return None
+    if len(header) < 60 or not header.startswith(b"DSD "):
+        return None
+    dsd_rate = struct.unpack_from("<I", header, 56)[0]
+    if dsd_rate < 16:
+        return None
+    return dsd_rate // 8
+
+
+def _fit_lowpass(lowpass: int, src: Path) -> int:
+    if lowpass <= 0:
+        return 0
+    rate = _pcm_rate(src)
+    if not rate or lowpass < rate / 2:
+        return lowpass
+    fitted = rate // 2 - 1
+    return fitted if fitted >= 1000 else 0
 
 
 def _relax_dsf_layout(path: Path) -> None:
