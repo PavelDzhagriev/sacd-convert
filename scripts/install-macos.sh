@@ -15,7 +15,7 @@ if ! command -v brew >/dev/null 2>&1; then
   exit 1
 fi
 
-brew install cmake libxml2 ffmpeg python node
+brew install cmake pkgconf libxml2 ffmpeg python node
 
 if ! python3 -c 'import sys; raise SystemExit(0 if sys.version_info >= (3, 9) else 1)'; then
   echo "Нужен Python 3.9 или новее." >&2
