@@ -1,0 +1,7 @@
+__pycache__/
+*.pyc
+.cache/
+build/
+dist/
+bin/sacd_extract
+.DS_Store

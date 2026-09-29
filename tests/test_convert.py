@@ -1,0 +1,159 @@
+import json
+import shutil
+import subprocess
+import tempfile
+import threading
+import unittest
+import urllib.request
+from pathlib import Path
+
+from kedr.models import EncodeSettings, KedrError
+from kedr.pipeline import build_ffmpeg_cmd, convert
+from kedr.probe import probe
+from kedr.server import KedrServer
+from kedr.jobs import JobStore
+from kedr.tools import find_tool, ffprobe_path
+from tests.dsfutil import write_tone_dsf
+
+
+class ConvertTests(unittest.TestCase):
+    def setUp(self) -> None:
+        self.tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(self.tmp.cleanup)
+        self.root = Path(self.tmp.name)
+
+    def test_dsf_becomes_24bit_flac_with_tone(self) -> None:
+        if shutil.which("ffmpeg") is None:
+            self.skipTest("ffmpeg is not installed")
+        source = self.root / "tone.dsf"
+        write_tone_dsf(source, seconds=0.25, frequency=440)
+        folder, files = convert(
+            str(source),
+            str(self.root / "albums"),
+            EncodeSettings(rate=176400, bits=24, lowpass=40000, compression=5),
+        )
+        self.assertTrue(folder.is_dir())
+        self.assertEqual(len(files), 1)
+        info = _probe(files[0])
+        stream = info["streams"][0]
+        self.assertEqual(stream["codec_name"], "flac")
+        self.assertEqual(int(stream["sample_rate"]), 176400)
+        self.assertEqual(int(stream["bits_per_raw_sample"]), 24)
+        self.assertEqual(info["format"]["tags"]["title"], "tone")
+        self.assertGreater(_magnitude(files[0], 440), 0.05)
+        self.assertLess(_magnitude(files[0], 1000), 0.01)
+
+    def test_command_uses_soxr_when_available(self) -> None:
+        if shutil.which("ffmpeg") is None:
+            self.skipTest("ffmpeg is not installed")
+        cmd = build_ffmpeg_cmd(
+            Path("in.dsf"),
+            Path("out.flac"),
+            EncodeSettings(),
+            {"title": "Весна"},
+        )
+        text = " ".join(cmd)
+        self.assertIn("aresample=", text)
+        self.assertIn("bits_per_raw_sample", text)
+        self.assertIn("title=Весна", text)
+
+    def test_bad_iso_is_explained(self) -> None:
+        if find_tool("KEDR_SACD_EXTRACT", "sacd_extract") is None:
+            self.skipTest("sacd_extract is not built")
+        fake = self.root / "not-sacd.iso"
+        fake.write_text("this is not a scarletbook image", encoding="utf-8")
+        with self.assertRaises(KedrError) as caught:
+            probe(str(fake))
+        self.assertIn("SACD", str(caught.exception))
+
+    def test_http_converts_dsf(self) -> None:
+        if shutil.which("ffmpeg") is None:
+            self.skipTest("ffmpeg is not installed")
+        source = self.root / "http-tone.dsf"
+        write_tone_dsf(source, seconds=0.2, frequency=440)
+        output = self.root / "http-out"
+        server = KedrServer(("127.0.0.1", 0), JobStore())
+        thread = threading.Thread(target=server.serve_forever, daemon=True)
+        thread.start()
+        self.addCleanup(server.shutdown)
+        self.addCleanup(server.server_close)
+        port = server.server_address[1]
+        base = f"http://127.0.0.1:{port}"
+
+        page = urllib.request.urlopen(base + "/", timeout=5)
+        self.assertIn("Кедр", page.read().decode())
+        health = _json(base + "/api/health")
+        self.assertTrue(health["ffmpeg"]["ok"])
+
+        disc = _json(base + "/api/probe", {"path": str(source)})
+        self.assertEqual(disc["kind"], "dsf")
+        self.assertEqual(disc["areas"][0]["tracks"][0]["title"], "http-tone")
+
+        job = _json(
+            base + "/api/convert",
+            {
+                "path": str(source),
+                "output_dir": str(output),
+                "mode": "stereo",
+                "tracks": [],
+                "rate": 88200,
+                "bits": 16,
+                "lowpass": 30000,
+                "compression": 5,
+            },
+        )
+        seen = job
+        for _ in range(80):
+            if seen["status"] != "running":
+                break
+            import time
+
+            time.sleep(0.25)
+            seen = _json(f"{base}/api/jobs/{job['id']}")
+        self.assertEqual(seen["status"], "done", seen)
+        flac = Path(seen["files"][0])
+        self.assertTrue(flac.is_file())
+        info = _probe(flac)
+        self.assertEqual(int(info["streams"][0]["sample_rate"]), 88200)
+
+
+def _json(url: str, payload: dict | None = None) -> dict:
+    data = None if payload is None else json.dumps(payload).encode()
+    request = urllib.request.Request(url, data=data, headers={"Content-Type": "application/json"})
+    with urllib.request.urlopen(request, timeout=10) as response:
+        return json.loads(response.read().decode())
+
+
+def _probe(path: Path) -> dict:
+    completed = subprocess.run(
+        [str(ffprobe_path()), "-v", "error", "-print_format", "json", "-show_format", "-show_streams", str(path)],
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+    return json.loads(completed.stdout)
+
+
+def _magnitude(path: Path, frequency: float) -> float:
+    raw = subprocess.check_output(
+        ["ffmpeg", "-v", "error", "-i", str(path), "-f", "f32le", "-ac", "1", "-"],
+    )
+    import array
+    import math
+
+    samples = array.array("f")
+    samples.frombytes(raw[: len(raw) // 4 * 4])
+    step = 4
+    series = samples[::step]
+    rate = 176400 / step
+    real = 0.0
+    imag = 0.0
+    omega = 2 * math.pi * frequency / rate
+    for index, sample in enumerate(series):
+        real += sample * math.cos(omega * index)
+        imag -= sample * math.sin(omega * index)
+    return math.hypot(real, imag) / max(1, len(series))
+
+
+if __name__ == "__main__":
+    unittest.main()

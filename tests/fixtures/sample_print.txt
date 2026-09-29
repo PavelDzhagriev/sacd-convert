@@ -1,0 +1,51 @@
+Disc Information:
+	Version:  1.20
+	Creation date: 2019-11-02
+	Disc Catalog Number: ABC-123
+	Disc Genre: Not Jazz
+	Locale: ru, Code character set:[0], UTF-8
+	Title: Disc Title Ignored
+	Title Phonetic: Disc Phonetic
+	Artist: Disc Artist Ignored
+
+Album Information:
+	Album Catalog Number: ALB-9
+	Sequence Number: 1
+	Set Size: 1
+	Album Genre: Jazz
+	Title: Времена года
+	Title Phonetic: Vremena goda
+	Artist: Антонио Вивальди
+	Publisher: Label
+
+Area count: 2
+	Area Information [0]:
+
+	Version:  1.20
+	Track Count: 2
+	Total play time: 12:00:00 [mins:secs:frames]
+	Speaker config: 2 Channel
+	Track list [0]:
+		Title[0]: Весна
+		Performer[0]: Камерный оркестр
+		Composer[0]: Вивальди
+		Track_Start_Time_Code: 00:00:00 [mins:secs:frames]
+		Duration: 03:20:00 [mins:secs:frames]
+
+		Title[1]: Лето
+		Performer[1]: Камерный оркестр
+		Track_Start_Time_Code: 03:20:00 [mins:secs:frames]
+		Duration: 08:40:15 [mins:secs:frames]
+
+	ISRC Track [0]:
+	  Country: IT, Owner: ABC, Year: 19, Designation: 00001
+	Area Information [1]:
+
+	Track Count: 2
+	Speaker config: 6 Channel
+	Track list [1]:
+		Title[0]: Весна
+		Duration: 03:20:00 [mins:secs:frames]
+
+		Title[1]: Лето
+		Duration: 08:40:15 [mins:secs:frames]

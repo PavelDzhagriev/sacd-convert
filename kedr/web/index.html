@@ -1,0 +1,119 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Кедр — SACD ISO в FLAC</title>
+  <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="/styles.css">
+</head>
+<body>
+  <div class="shell">
+    <header class="top">
+      <div class="brand">
+        <svg class="logo" viewBox="0 0 32 32" aria-hidden="true">
+          <rect width="32" height="32" rx="8" fill="#2a2118"/>
+          <path fill="#e39a4b" d="M16 5 20.2 12.2H11.8L16 5Z"/>
+          <path fill="#e8b56d" d="M16 9.2 22.4 18.4H9.6L16 9.2Z"/>
+          <path fill="#f0d3a4" d="M16 14.2 24.2 25.2H7.8L16 14.2Z"/>
+          <rect x="14.4" y="24.2" width="3.2" height="4.2" rx="0.6" fill="#c4844a"/>
+        </svg>
+        <div>
+          <p class="eyebrow">Утилита для macOS</p>
+          <h1>Кедр</h1>
+        </div>
+      </div>
+      <p id="health" class="health">Проверяю инструменты…</p>
+    </header>
+
+    <p id="notice" class="notice" hidden></p>
+
+    <div class="layout">
+      <section class="panel" aria-labelledby="source-title">
+        <div class="panel-head">
+          <h2 id="source-title">Образ</h2>
+          <p>SACD ISO или уже извлечённый DSF. FLAC получит PCM, не однобитный поток.</p>
+        </div>
+        <label class="field">
+          <span>Путь к файлу</span>
+          <input id="iso-path" type="text" spellcheck="false" placeholder="/Users/pavel/Music/Album.iso" autocomplete="off">
+        </label>
+        <div class="row">
+          <button id="pick-file" class="ghost" type="button">Выбрать файл</button>
+          <button id="read-disc" class="primary" type="button">Прочитать</button>
+        </div>
+        <div id="disc" class="disc empty">
+          <p class="disc-kicker">Оглавление</p>
+          <p class="disc-title">Диск ещё не прочитан</p>
+          <p class="disc-copy">Кедр снимет DST с образа, отфильтрует ультразвуковой шум DSD и запишет 24-битный FLAC.</p>
+        </div>
+        <div id="areas" class="segment" hidden></div>
+      </section>
+
+      <section class="panel" aria-labelledby="pcm-title">
+        <div class="panel-head">
+          <h2 id="pcm-title">PCM</h2>
+          <p>Для DSD64 обычно хватает 176,4 кГц и среза на 40 кГц.</p>
+        </div>
+        <fieldset>
+          <legend>Частота</legend>
+          <div id="rate" class="segment" role="group"></div>
+        </fieldset>
+        <fieldset>
+          <legend>Разрядность</legend>
+          <div id="bits" class="segment" role="group"></div>
+        </fieldset>
+        <fieldset>
+          <legend>Срез шума</legend>
+          <div id="lowpass" class="segment" role="group"></div>
+          <p class="hint">Выше 20 кГц у DSD быстро растёт шум. Срез оставляет музыку и не тащит этот шум в FLAC.</p>
+        </fieldset>
+        <label class="field">
+          <span>Сжатие FLAC <strong id="compression-label">8</strong></span>
+          <input id="compression" type="range" min="0" max="8" step="1" value="8">
+        </label>
+        <label class="field">
+          <span>Папка для альбомов</span>
+          <input id="out-path" type="text" spellcheck="false" placeholder="/Users/pavel/Music" autocomplete="off">
+        </label>
+        <div class="row">
+          <button id="pick-folder" class="ghost" type="button">Выбрать папку</button>
+        </div>
+        <p id="preview" class="preview"></p>
+        <p id="estimate" class="hint"></p>
+        <div class="actions">
+          <button id="convert" class="primary wide" type="button" disabled>Преобразовать в FLAC</button>
+          <button id="cancel" class="ghost" type="button" hidden>Остановить</button>
+        </div>
+      </section>
+    </div>
+
+    <section class="panel tracks" aria-labelledby="tracks-title">
+      <div class="panel-head split">
+        <div>
+          <h2 id="tracks-title">Дорожки</h2>
+          <p id="tracks-meta">Появятся после чтения диска.</p>
+        </div>
+        <label id="select-all-wrap" class="check-all" hidden>
+          <input id="select-all" type="checkbox" checked>
+          <span>Все</span>
+        </label>
+      </div>
+      <div id="progress" class="progress" hidden>
+        <div id="progress-bar"></div>
+      </div>
+      <p id="job-message" class="job-message" hidden></p>
+      <ol id="track-list"></ol>
+      <div id="done" class="done" hidden>
+        <p id="done-text"></p>
+        <button id="reveal" class="ghost" type="button">Открыть папку</button>
+      </div>
+    </section>
+
+    <footer>
+      <p>DSD — однобитный поток 2,8 МГц. FLAC хранит PCM, поэтому Кедр декодирует DSD фильтром ffmpeg и, если можно, ресемплером SoX.</p>
+    </footer>
+  </div>
+  <script src="/app.js"></script>
+</body>
+</html>
