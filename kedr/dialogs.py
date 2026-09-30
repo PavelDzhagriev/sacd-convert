@@ -13,32 +13,41 @@ class DialogUnavailable(KedrError):
     pass
 
 
-_FILE_SCRIPT = """
+_PROMPTS = {
+    "ru": {
+        "file": "Выберите SACD ISO или DSF",
+        "folder": "Папка для альбомов",
+        "filter": "SACD и DSD",
+    },
+    "en": {
+        "file": "Choose a SACD ISO or DSF",
+        "folder": "Album folder",
+        "filter": "SACD and DSD",
+    },
+}
+
+
+def _script(kind: str, locale: str) -> str:
+    prompt = _PROMPTS[locale]["file" if kind == "iso" else "folder"]
+    noun = "file" if kind == "iso" else "folder"
+    return f"""
 try
-    set picked to choose file with prompt "Выберите SACD ISO или DSF"
+    set picked to choose {noun} with prompt "{prompt}"
     return POSIX path of picked
 on error
     return ""
 end try
 """
 
-_FOLDER_SCRIPT = """
-try
-    set picked to choose folder with prompt "Куда сохранить FLAC"
-    return POSIX path of picked
-on error
-    return ""
-end try
-"""
 
-
-def choose(kind: str) -> str | None:
+def choose(kind: str, locale: str = "ru") -> str | None:
     if kind not in {"iso", "folder"}:
         raise KedrError("Неизвестный диалог.")
+    lang = locale if locale in _PROMPTS else "en"
     if sys.platform == "darwin":
-        return _osascript(_FILE_SCRIPT if kind == "iso" else _FOLDER_SCRIPT)
+        return _osascript(_script(kind, lang))
     if os.environ.get("DISPLAY") and shutil.which("zenity"):
-        return _zenity(kind)
+        return _zenity(kind, lang)
     raise DialogUnavailable(
         "Окно выбора файла доступно в приложении на Mac. Вставьте путь вручную."
     )
@@ -72,12 +81,14 @@ def _osascript(script: str) -> str | None:
     return path
 
 
-def _zenity(kind: str) -> str | None:
-    cmd = ["zenity", "--file-selection", "--title=Кедр"]
+def _zenity(kind: str, locale: str) -> str | None:
+    title = _PROMPTS[locale]["file" if kind == "iso" else "folder"]
+    cmd = ["zenity", "--file-selection", f"--title={title}"]
     if kind == "folder":
         cmd.append("--directory")
     else:
-        cmd.extend(["--file-filter=SACD и DSF | *.iso *.ISO *.dsf *.DSF"])
+        label = _PROMPTS[locale]["filter"]
+        cmd.extend([f"--file-filter={label} | *.iso *.ISO *.dsf *.DSF"])
     completed = subprocess.run(cmd, check=False, capture_output=True, text=True)
     path = (completed.stdout or "").strip()
     if completed.returncode != 0 or not path:

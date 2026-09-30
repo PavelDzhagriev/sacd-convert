@@ -22,11 +22,49 @@ function freePort() {
   });
 }
 
+function systemLocale() {
+  const tag = String(app.getLocale() || "").toLowerCase();
+  return tag === "ru" || tag.startsWith("ru-") ? "ru" : "en";
+}
+
+function engineText() {
+  if (systemLocale() === "ru") {
+    return {
+      timeout: "Движок Кедра не ответил за 20 секунд.",
+      stopped: (code, tail) => `Движок Кедра остановился (код ${code}).${tail ? `\n${tail}` : ""}`,
+      python: (message) => `Не удалось запустить Python: ${message}`,
+    };
+  }
+  return {
+    timeout: "The Kedr engine did not respond within 20 seconds.",
+    stopped: (code, tail) => `The Kedr engine stopped (code ${code}).${tail ? `\n${tail}` : ""}`,
+    python: (message) => `Could not start Python: ${message}`,
+  };
+}
+
+function dialogCopy(locale) {
+  if (locale === "ru") {
+    return {
+      fileTitle: "Образ SACD или DSF",
+      filter: "SACD и DSD",
+      all: "Все файлы",
+      folderTitle: "Папка для альбомов",
+    };
+  }
+  return {
+    fileTitle: "SACD image or DSF",
+    filter: "SACD and DSD",
+    all: "All files",
+    folderTitle: "Album folder",
+  };
+}
+
 function waitForEngine(child, port) {
+  const text = engineText();
   return new Promise((resolve, reject) => {
     let buffer = "";
     const timer = setTimeout(() => {
-      reject(new Error("Движок Кедра не ответил за 20 секунд."));
+      reject(new Error(text.timeout));
     }, 20000);
     const finish = (error) => {
       clearTimeout(timer);
@@ -42,7 +80,7 @@ function waitForEngine(child, port) {
     };
     const onExit = (code) => {
       const tail = buffer.trim().split("\n").slice(-8).join("\n");
-      finish(new Error(`Движок Кедра остановился (код ${code}).${tail ? `\n${tail}` : ""}`));
+      finish(new Error(text.stopped(code, tail)));
     };
     child.stdout.on("data", onData);
     child.stderr.on("data", onData);
@@ -64,7 +102,7 @@ async function startEngine() {
   });
   engine = child;
   child.on("error", (error) => {
-    dialog.showErrorBox("Кедр", `Не удалось запустить Python: ${error.message}`);
+    dialog.showErrorBox("Кедр", engineText().python(error.message));
   });
   await waitForEngine(child, port);
   return port;
@@ -114,20 +152,21 @@ function buildMenu() {
   Menu.setApplicationMenu(Menu.buildFromTemplate(template));
 }
 
-ipcMain.handle("kedr:pick", async (_event, kind) => {
+ipcMain.handle("kedr:pick", async (_event, kind, locale) => {
   const parent = BrowserWindow.getFocusedWindow() || mainWindow;
   const file = kind === "iso" || kind === "file";
+  const copy = dialogCopy(locale === "ru" ? "ru" : locale === "en" ? "en" : systemLocale());
   const result = await dialog.showOpenDialog(parent, file
     ? {
-      title: "Образ SACD или DSF",
+      title: copy.fileTitle,
       properties: ["openFile"],
       filters: [
-        { name: "SACD и DSD", extensions: ["iso", "dsf", "dff"] },
-        { name: "Все файлы", extensions: ["*"] },
+        { name: copy.filter, extensions: ["iso", "dsf", "dff"] },
+        { name: copy.all, extensions: ["*"] },
       ],
     }
     : {
-      title: "Папка для альбомов",
+      title: copy.folderTitle,
       properties: ["openDirectory", "createDirectory"],
     });
   if (result.canceled || !result.filePaths[0]) return { cancelled: true };

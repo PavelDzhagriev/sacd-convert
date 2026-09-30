@@ -6,6 +6,7 @@
   <title>Кедр — SACD в FLAC или MP3</title>
   <link rel="icon" href="/favicon.svg" type="image/svg+xml">
   <link rel="stylesheet" href="/styles.css">
+  <script src="/i18n.js"></script>
 </head>
 <body>
   <div class="shell">
@@ -19,7 +20,7 @@
           <rect x="14.4" y="24.2" width="3.2" height="4.2" rx="0.6" fill="#c4844a"/>
         </svg>
         <div>
-          <p class="eyebrow">Утилита для macOS</p>
+          <p class="eyebrow" data-i18n="eyebrow">Утилита для macOS</p>
           <h1>Кедр</h1>
         </div>
       </div>
@@ -31,9 +32,9 @@
     <div class="workspace">
       <section class="panel library" aria-labelledby="tracks-title">
         <div class="source-row">
-          <input id="iso-path" type="text" spellcheck="false" placeholder="SACD ISO или DSF" aria-label="Путь к файлу" autocomplete="off">
-          <button id="pick-file" class="ghost" type="button">Файл</button>
-          <button id="read-disc" class="primary" type="button">Прочитать</button>
+          <input id="iso-path" type="text" spellcheck="false" placeholder="SACD ISO или DSF" aria-label="Путь к файлу" autocomplete="off" data-i18n-placeholder="isoPlaceholder" data-i18n-aria="filePath">
+          <button id="pick-file" class="ghost" type="button" data-i18n="pickFile">Файл</button>
+          <button id="read-disc" class="primary" type="button" data-i18n="readDisc">Прочитать</button>
         </div>
         <div id="disc" class="disc empty">
           <p class="disc-kicker">Оглавление</p>
@@ -43,12 +44,12 @@
         <div id="areas" class="segment" hidden></div>
         <div class="panel-head split">
           <div>
-            <h2 id="tracks-title">Дорожки</h2>
+            <h2 id="tracks-title" data-i18n="tracksTitle">Дорожки</h2>
             <p id="tracks-meta">Появятся после чтения диска.</p>
           </div>
           <label id="select-all-wrap" class="check-all" hidden>
             <input id="select-all" type="checkbox" checked>
-            <span>Все</span>
+            <span data-i18n="selectAll">Все</span>
           </label>
         </div>
         <div id="progress" class="progress" hidden>
@@ -60,46 +61,49 @@
         </div>
         <div id="done" class="done" hidden>
           <p id="done-text"></p>
-          <button id="reveal" class="ghost" type="button">Открыть папку</button>
+          <button id="reveal" class="ghost" type="button" data-i18n="reveal">Открыть папку</button>
         </div>
       </section>
 
       <section class="panel settings" aria-labelledby="pcm-title">
         <div class="settings-body">
-        <div class="panel-head">
-          <h2 id="pcm-title">FLAC</h2>
-          <p id="pcm-lead">176,4 кГц, 24 бит, срез 40 кГц.</p>
+        <div class="panel-head split">
+          <div>
+            <h2 id="pcm-title">FLAC</h2>
+            <p id="pcm-lead">176,4 кГц, 24 бит, срез 40 кГц.</p>
+          </div>
+          <div id="locale" class="segment locale" role="group" aria-label="Язык"></div>
         </div>
         <fieldset>
-          <legend>Формат</legend>
+          <legend data-i18n="format">Формат</legend>
           <div id="format" class="segment" role="group"></div>
           <p id="format-hint" class="hint" hidden></p>
         </fieldset>
         <fieldset>
-          <legend>Частота</legend>
+          <legend data-i18n="sampleRate">Частота</legend>
           <div id="rate" class="segment" role="group"></div>
         </fieldset>
         <fieldset id="bits-block">
-          <legend>Разрядность</legend>
+          <legend data-i18n="bitDepth">Разрядность</legend>
           <div id="bits" class="segment" role="group"></div>
         </fieldset>
         <fieldset id="bitrate-block" hidden>
-          <legend>Битрейт, кбит/с</legend>
+          <legend data-i18n="bitrate">Битрейт, кбит/с</legend>
           <div id="bitrate" class="segment" role="group"></div>
         </fieldset>
         <fieldset>
-          <legend>Срез шума</legend>
+          <legend data-i18n="lowpass">Срез шума</legend>
           <div id="lowpass" class="segment" role="group"></div>
         </fieldset>
         <label id="compression-block" class="field">
-          <span>Сжатие FLAC <strong id="compression-label">8</strong></span>
+          <span><span data-i18n="compression">Сжатие FLAC</span> <strong id="compression-label">8</strong></span>
           <input id="compression" type="range" min="0" max="8" step="1" value="8">
         </label>
         <label class="field">
-          <span>Куда сохранить</span>
+          <span data-i18n="saveTo">Куда сохранить</span>
           <div class="source-row">
-            <input id="out-path" type="text" spellcheck="false" placeholder="/Users/pavel/Music" aria-label="Папка для альбомов" autocomplete="off">
-            <button id="pick-folder" class="ghost" type="button">Папка</button>
+            <input id="out-path" type="text" spellcheck="false" placeholder="/Users/pavel/Music" aria-label="Папка для альбомов" autocomplete="off" data-i18n-aria="folderPath">
+            <button id="pick-folder" class="ghost" type="button" data-i18n="pickFolder">Папка</button>
           </div>
         </label>
         <p id="preview" class="preview"></p>
@@ -107,7 +111,7 @@
         </div>
         <div class="actions">
           <button id="convert" class="primary wide" type="button" disabled>Преобразовать в FLAC</button>
-          <button id="cancel" class="ghost" type="button" hidden>Остановить</button>
+          <button id="cancel" class="ghost" type="button" hidden data-i18n="cancel">Остановить</button>
         </div>
       </section>
     </div>

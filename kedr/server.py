@@ -21,6 +21,7 @@ FILES = {
     "/": "index.html",
     "/index.html": "index.html",
     "/app.js": "app.js",
+    "/i18n.js": "i18n.js",
     "/styles.css": "styles.css",
     "/favicon.svg": "favicon.svg",
     "/icon.png": "icon.png",
@@ -79,7 +80,7 @@ class Handler(BaseHTTPRequestHandler):
                 self._json(200, job.snapshot())
                 return
             if path == "/api/dialog":
-                self._json(200, _dialog(str(payload.get("kind", ""))))
+                self._json(200, _dialog(str(payload.get("kind", "")), str(payload.get("locale") or "")))
                 return
             if path == "/api/reveal":
                 reveal(str(payload.get("path", "")))
@@ -236,9 +237,9 @@ def _tracks(value) -> list[int] | None:
     return numbers
 
 
-def _dialog(kind: str) -> dict:
+def _dialog(kind: str, locale: str) -> dict:
     try:
-        path = choose(kind)
+        path = choose(kind, locale if locale == "ru" else "en")
     except DialogUnavailable as exc:
         return {"unavailable": True, "message": str(exc)}
     if not path:

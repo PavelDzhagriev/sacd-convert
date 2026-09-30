@@ -152,9 +152,15 @@ h2 {
 .panel-head.split {
   display: flex;
   justify-content: space-between;
-  gap: 16px;
+  gap: 12px;
   align-items: end;
 }
+
+.settings .panel-head.split { align-items: center; }
+.settings .panel-head.split > div:first-child { min-width: 0; }
+
+.segment.locale { flex: none; align-self: center; }
+.segment.locale button { padding: 4px 9px; font-size: 0.78rem; }
 
 .source-row {
   display: flex;
