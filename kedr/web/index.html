@@ -28,37 +28,52 @@
 
     <p id="notice" class="notice" hidden></p>
 
-    <div class="layout">
-      <section class="panel" aria-labelledby="source-title">
-        <div class="panel-head">
-          <h2 id="source-title">Образ</h2>
-          <p>SACD ISO или уже извлечённый DSF. На выходе PCM: FLAC без потерь или MP3.</p>
-        </div>
-        <label class="field">
-          <span>Путь к файлу</span>
-          <input id="iso-path" type="text" spellcheck="false" placeholder="/Users/pavel/Music/Album.iso" autocomplete="off">
-        </label>
-        <div class="row">
-          <button id="pick-file" class="ghost" type="button">Выбрать файл</button>
+    <div class="workspace">
+      <section class="panel library" aria-labelledby="tracks-title">
+        <div class="source-row">
+          <input id="iso-path" type="text" spellcheck="false" placeholder="SACD ISO или DSF" aria-label="Путь к файлу" autocomplete="off">
+          <button id="pick-file" class="ghost" type="button">Файл</button>
           <button id="read-disc" class="primary" type="button">Прочитать</button>
         </div>
         <div id="disc" class="disc empty">
           <p class="disc-kicker">Оглавление</p>
           <p class="disc-title">Диск ещё не прочитан</p>
-          <p class="disc-copy">Кедр снимет DST с образа, отфильтрует ультразвуковой шум DSD и запишет FLAC или MP3.</p>
+          <p class="disc-copy">Выберите образ или уже извлечённый DSF.</p>
         </div>
         <div id="areas" class="segment" hidden></div>
+        <div class="panel-head split">
+          <div>
+            <h2 id="tracks-title">Дорожки</h2>
+            <p id="tracks-meta">Появятся после чтения диска.</p>
+          </div>
+          <label id="select-all-wrap" class="check-all" hidden>
+            <input id="select-all" type="checkbox" checked>
+            <span>Все</span>
+          </label>
+        </div>
+        <div id="progress" class="progress" hidden>
+          <div id="progress-bar"></div>
+        </div>
+        <p id="job-message" class="job-message" hidden></p>
+        <div class="track-scroll">
+          <ol id="track-list"></ol>
+        </div>
+        <div id="done" class="done" hidden>
+          <p id="done-text"></p>
+          <button id="reveal" class="ghost" type="button">Открыть папку</button>
+        </div>
       </section>
 
-      <section class="panel" aria-labelledby="pcm-title">
+      <section class="panel settings" aria-labelledby="pcm-title">
+        <div class="settings-body">
         <div class="panel-head">
           <h2 id="pcm-title">FLAC</h2>
-          <p id="pcm-lead">Для DSD64 обычно хватает 176,4 кГц и среза на 40 кГц.</p>
+          <p id="pcm-lead">176,4 кГц, 24 бит, срез 40 кГц.</p>
         </div>
         <fieldset>
           <legend>Формат</legend>
           <div id="format" class="segment" role="group"></div>
-          <p id="format-hint" class="hint"></p>
+          <p id="format-hint" class="hint" hidden></p>
         </fieldset>
         <fieldset>
           <legend>Частота</legend>
@@ -75,53 +90,27 @@
         <fieldset>
           <legend>Срез шума</legend>
           <div id="lowpass" class="segment" role="group"></div>
-          <p class="hint">Выше 20 кГц у DSD быстро растёт шум. Срез оставляет музыку и не тащит этот шум в файл.</p>
         </fieldset>
         <label id="compression-block" class="field">
           <span>Сжатие FLAC <strong id="compression-label">8</strong></span>
           <input id="compression" type="range" min="0" max="8" step="1" value="8">
         </label>
         <label class="field">
-          <span>Папка для альбомов</span>
-          <input id="out-path" type="text" spellcheck="false" placeholder="/Users/pavel/Music" autocomplete="off">
+          <span>Куда сохранить</span>
+          <div class="source-row">
+            <input id="out-path" type="text" spellcheck="false" placeholder="/Users/pavel/Music" aria-label="Папка для альбомов" autocomplete="off">
+            <button id="pick-folder" class="ghost" type="button">Папка</button>
+          </div>
         </label>
-        <div class="row">
-          <button id="pick-folder" class="ghost" type="button">Выбрать папку</button>
-        </div>
         <p id="preview" class="preview"></p>
         <p id="estimate" class="hint"></p>
+        </div>
         <div class="actions">
           <button id="convert" class="primary wide" type="button" disabled>Преобразовать в FLAC</button>
           <button id="cancel" class="ghost" type="button" hidden>Остановить</button>
         </div>
       </section>
     </div>
-
-    <section class="panel tracks" aria-labelledby="tracks-title">
-      <div class="panel-head split">
-        <div>
-          <h2 id="tracks-title">Дорожки</h2>
-          <p id="tracks-meta">Появятся после чтения диска.</p>
-        </div>
-        <label id="select-all-wrap" class="check-all" hidden>
-          <input id="select-all" type="checkbox" checked>
-          <span>Все</span>
-        </label>
-      </div>
-      <div id="progress" class="progress" hidden>
-        <div id="progress-bar"></div>
-      </div>
-      <p id="job-message" class="job-message" hidden></p>
-      <ol id="track-list"></ol>
-      <div id="done" class="done" hidden>
-        <p id="done-text"></p>
-        <button id="reveal" class="ghost" type="button">Открыть папку</button>
-      </div>
-    </section>
-
-    <footer>
-      <p>DSD — однобитный поток 2,8 МГц. И FLAC, и MP3 получают PCM после фильтра ffmpeg. MP3 дополнительно сжимает LAME и не бывает выше 48 кГц.</p>
-    </footer>
   </div>
   <script src="/app.js"></script>
 </body>

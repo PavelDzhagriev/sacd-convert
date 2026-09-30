@@ -160,8 +160,8 @@ function renderChoices() {
   $("bitrate-block").hidden = !mp3;
   $("pcm-title").textContent = mp3 ? "MP3" : "FLAC";
   $("pcm-lead").textContent = mp3
-    ? "LAME, постоянный битрейт. Выше 48 кГц MP3 не бывает."
-    : "Для DSD64 обычно хватает 176,4 кГц и среза на 40 кГц.";
+    ? "LAME, не выше 48 кГц."
+    : "176,4 кГц и срез 40 кГц для DSD64.";
   const blocked = mp3Blocked();
   const hint = blocked
     ? "MP3 не вмещает 5.1. Выберите FLAC или стереозону."
@@ -266,7 +266,7 @@ function renderDisc() {
     node.replaceChildren();
     node.append(line("p", "disc-kicker", "Оглавление"));
     node.append(line("p", "disc-title", "Диск ещё не прочитан"));
-    node.append(line("p", "disc-copy", "Кедр снимет DST с образа, отфильтрует ультразвуковой шум DSD и запишет FLAC или MP3."));
+    node.append(line("p", "disc-copy", "Выберите образ или уже извлечённый DSF."));
     areas.hidden = true;
     return;
   }
