@@ -1,8 +1,8 @@
-# Kedr
+# Kedr — SACD ISO and DSF to FLAC or MP3
 
-Desktop app that converts a Super Audio CD ISO (DSD) or a DSF file into PCM FLAC or MP3.
+Kedr converts a Super Audio CD image to PCM: SACD ISO (DSD ISO) and DSF to FLAC or MP3.
 
-![Kedr window](docs/window.png)
+![Kedr, SACD ISO to FLAC](docs/window.png)
 
 A Super Audio CD image stores one-bit DSD, often still packed as DST. FLAC and MP3 store PCM. Kedr reads the table of contents, decodes DST, and writes the format you pick, with tags taken from the disc. The window is Electron. Conversion stays on the machine and is done by Python.
 
