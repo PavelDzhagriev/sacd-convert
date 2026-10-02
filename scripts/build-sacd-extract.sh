@@ -4,6 +4,32 @@ set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 PIN="a3d981c935c3224217e2842cd492f9351106c81e"
+
+copy_runtime_dlls() {
+  local exe="$1" dest="$2"
+  if ! command -v ldd >/dev/null 2>&1; then
+    echo "ldd не найден, DLL рядом с sacd_extract.exe не скопированы." >&2
+    return 0
+  fi
+  local deps=""
+  deps="$(ldd "$exe" 2>/dev/null || true)"
+  local line target
+  while IFS= read -r line; do
+    case "$line" in
+      *"=>"*) ;;
+      *) continue ;;
+    esac
+    target="${line#*=> }"
+    target="${target%% (*}"
+    target="${target%"${target##*[![:space:]]}"}"
+    case "$target" in
+      /ucrt64/*|/mingw64/*|/mingw32/*|/usr/*)
+        cp -f "$target" "$dest/"
+        ;;
+    esac
+  done <<< "$deps"
+}
+
 SRC="$ROOT/build/sacd-ripper"
 BUILD="$ROOT/build/sacd-extract"
 
@@ -60,7 +86,13 @@ fi
 git -C "$SRC" fetch --depth 1 origin "$PIN"
 git -C "$SRC" checkout --force --detach "$PIN"
 
-python3 - "$SRC/tools/sacd_extract/CMakeLists.txt" << 'PY'
+PYTHON="$(command -v python3 || command -v python || true)"
+if [[ -z "$PYTHON" ]]; then
+  echo "Нужен python3." >&2
+  exit 1
+fi
+
+"$PYTHON" - "$SRC/tools/sacd_extract/CMakeLists.txt" << 'PY'
 import pathlib, sys
 path = pathlib.Path(sys.argv[1])
 text = path.read_text()
@@ -70,6 +102,8 @@ if old in text and new not in text:
     text = text.replace(old, new, 1)
 # Обратные кавычки здесь не запускают xml2-config, а Clang на Mac падает на --cflags.
 text = text.replace(" `xml2-config --cflags --libs`", "")
+# -static тянет все зависимости libxml2 статически и на MSYS2 обычно не линкуется.
+text = text.replace(" -lxml2 -static", " -lxml2")
 needle = "find_package(LibXml2 REQUIRED)\n"
 include = "include_directories(${LIBXML2_INCLUDE_DIR})\n"
 if needle in text and include not in text:
@@ -89,7 +123,27 @@ if [[ -n "$LIBXML_CFLAGS" ]]; then
   cmake_args+=("-DCMAKE_EXE_LINKER_FLAGS=${LIBXML_LDFLAGS}")
 fi
 cmake "${cmake_args[@]}"
-cmake --build "$BUILD" -j"$(getconf _NPROCESSORS_ONLN 2>/dev/null || echo 4)"
-cp "$BUILD/sacd_extract" "$ROOT/bin/sacd_extract"
-chmod +x "$ROOT/bin/sacd_extract"
-echo "Готово: $ROOT/bin/sacd_extract"
+cmake --build "$BUILD" -j"$(getconf _NPROCESSORS_ONLN 2>/dev/null || nproc 2>/dev/null || echo 4)"
+
+case "$(uname -s)" in
+  MINGW*|MSYS*|CYGWIN*)
+    BIN_NAME="sacd_extract.exe"
+    ;;
+  *)
+    BIN_NAME="sacd_extract"
+    ;;
+esac
+artifact="$BUILD/$BIN_NAME"
+if [[ ! -f "$artifact" ]]; then
+  artifact="$(find "$BUILD" -type f -name "$BIN_NAME" -print -quit)"
+fi
+if [[ -z "${artifact}" || ! -f "$artifact" ]]; then
+  echo "Сборка не создала $BIN_NAME." >&2
+  exit 1
+fi
+cp "$artifact" "$ROOT/bin/$BIN_NAME"
+chmod +x "$ROOT/bin/$BIN_NAME"
+if [[ "$BIN_NAME" == "sacd_extract.exe" ]]; then
+  copy_runtime_dlls "$ROOT/bin/$BIN_NAME" "$ROOT/bin"
+fi
+echo "Готово: $ROOT/bin/$BIN_NAME"

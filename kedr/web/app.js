@@ -103,7 +103,7 @@ function renderHealth(data) {
   const missing = [];
   if (!data.ffmpeg.ok) missing.push("ffmpeg");
   if (!data.sacd_extract.ok) missing.push("sacd_extract");
-  const hint = data.platform === "darwin" ? t("hintMac") : t("hintOther");
+  const hint = data.platform === "darwin" ? t("hintMac") : data.platform === "win32" ? t("hintWin") : t("hintOther");
   node.textContent = t("healthMissing", { tools: i18n.joinAnd(missing), hint });
   node.className = "health bad";
 }

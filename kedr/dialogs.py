@@ -49,7 +49,7 @@ def choose(kind: str, locale: str = "ru") -> str | None:
     if os.environ.get("DISPLAY") and shutil.which("zenity"):
         return _zenity(kind, lang)
     raise DialogUnavailable(
-        "Окно выбора файла доступно в приложении на Mac. Вставьте путь вручную."
+        "Окно выбора файла доступно в настольном приложении. Вставьте путь вручную."
     )
 
 
@@ -59,6 +59,9 @@ def reveal(raw: str) -> None:
         raise KedrError("Этой папки уже нет.")
     if sys.platform == "darwin":
         subprocess.Popen(["open", str(path)])
+        return
+    if sys.platform == "win32":
+        os.startfile(path)
         return
     opener = shutil.which("xdg-open")
     if opener and os.environ.get("DISPLAY"):

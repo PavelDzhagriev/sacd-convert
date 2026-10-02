@@ -6,8 +6,8 @@
 
 ## Что нужно
 
-- macOS 11 или новее (на Linux работает окно Electron и команда `python3 -m kedr`)
-- [Homebrew](https://brew.sh)
+- macOS 11 или новее, либо Windows 10/11 (на Linux работает окно Electron и команда `python3 -m kedr`)
+- На Mac — [Homebrew](https://brew.sh). На Windows — winget, он уже есть в системе
 - Python 3.9+, Node.js, ffmpeg и `sacd_extract`
 
 `sacd_extract` — отдельная программа из [sacd-ripper](https://github.com/sacd-ripper/sacd-ripper) (GPL-2.0). Обычный ffmpeg образ SACD не открывает. Код Кедра — MIT, extractor при установке скачивается и собирается отдельно.
@@ -24,6 +24,18 @@ open ~/Applications/Kedr.app
 Скрипт ставит `cmake`, `pkgconf`, `libxml2`, `ffmpeg`, Python и Node, собирает `sacd_extract`, ставит Electron и кладёт ярлык «Кедр» в `~/Applications`. `libxml2` в Homebrew спрятана от системных заголовков, скрипт сам подставляет её путь. Окно открывает локальную страницу. В интернет альбом не уходит.
 
 Повторный запуск скрипта обновляет ярлык после изменений в этой папке.
+
+## Установка на Windows
+
+В PowerShell, из папки с этим файлом. Для MSYS2 в `C:\msys64` обычно нужны права администратора:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\scripts\install-windows.ps1
+```
+
+Скрипт через winget ставит MSYS2, Python, Node и ffmpeg, в UCRT64 собирает `sacd_extract.exe` (DLL ложатся рядом с ним), ставит Electron и кладёт ярлык «Кедр» на рабочий стол. Ярлык — `dist\Kedr.cmd`: он запускает Electron из этой папки. Подписанного установщика нет, собирать нужно на самой Windows.
+
+Папку проекта после установки не переносите: ярлык указывает на неё.
 
 Без установщика, из этой же папки:
 
@@ -81,4 +93,4 @@ python3 -m unittest discover -s tests
 - Нужен целый образ SACD, не DVD-Audio и не обычный CD ISO.
 - MP3 не бывает многоканальным и не бывает выше 48 кГц. Для 5.1 нужен FLAC.
 - Многоканальный FLAC воспроизводят не все плееры.
-- Подписанного `.app` с вложенным Electron здесь нет: на Mac `scripts/install-macos.sh` ставит Electron в папку проекта и запускает его из ярлыка.
+- Подписанного приложения с вложенным Electron здесь нет. На Mac `scripts/install-macos.sh` и на Windows `scripts/install-windows.ps1` ставят Electron в папку проекта и запускают его из ярлыка.

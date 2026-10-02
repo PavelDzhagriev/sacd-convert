@@ -1,5 +1,6 @@
 const { app, BrowserWindow, Menu, dialog, ipcMain, shell } = require("electron");
-const { spawn } = require("child_process");
+const { spawn, spawnSync } = require("child_process");
+const fs = require("fs");
 const net = require("net");
 const path = require("path");
 
@@ -88,16 +89,41 @@ function waitForEngine(child, port) {
   });
 }
 
+function pythonLaunch() {
+  if (process.platform !== "win32") return { command: "python3", prefix: [] };
+  const options = [
+    ["py", ["-3"]],
+    ["python", []],
+    ["python3", []],
+  ];
+  for (const [command, prefix] of options) {
+    const probe = spawnSync(command, [...prefix, "-c", "import sys; raise SystemExit(0 if sys.version_info >= (3, 9) else 1)"], {
+      windowsHide: true,
+      timeout: 8000,
+    });
+    if (probe.status === 0) return { command, prefix };
+  }
+  return { command: "py", prefix: ["-3"] };
+}
+
 async function startEngine() {
   const port = await freePort();
   const env = { ...process.env, PYTHONPATH: ROOT, PYTHONUNBUFFERED: "1" };
   if (process.platform === "darwin") {
     env.PATH = ["/opt/homebrew/bin", "/usr/local/bin", env.PATH || ""].filter(Boolean).join(":");
   }
-  const child = spawn("python3", ["-m", "kedr", "serve", "--port", String(port)], {
+  if (process.platform === "win32") {
+    env.PYTHONUTF8 = "1";
+    env.PYTHONIOENCODING = "utf-8";
+    const extractor = path.join(ROOT, "bin", "sacd_extract.exe");
+    if (!env.KEDR_SACD_EXTRACT && fs.existsSync(extractor)) env.KEDR_SACD_EXTRACT = extractor;
+  }
+  const python = pythonLaunch();
+  const child = spawn(python.command, [...python.prefix, "-m", "kedr", "serve", "--port", String(port)], {
     cwd: ROOT,
     env,
-    detached: true,
+    detached: process.platform !== "win32",
+    windowsHide: true,
     stdio: ["ignore", "pipe", "pipe"],
   });
   engine = child;
@@ -112,6 +138,10 @@ function stopEngine() {
   if (!engine || engine.killed) return;
   const pid = engine.pid;
   engine = null;
+  if (process.platform === "win32") {
+    spawnSync("taskkill", ["/F", "/T", "/PID", String(pid)], { windowsHide: true });
+    return;
+  }
   try {
     process.kill(-pid, "SIGTERM");
   } catch (_error) {

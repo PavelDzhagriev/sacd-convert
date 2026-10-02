@@ -185,6 +185,8 @@ def health() -> dict:
     sacd = find_tool("KEDR_SACD_EXTRACT", "sacd_extract")
     if sys.platform == "darwin":
         hint = "Выполните scripts/install-macos.sh — скрипт поставит ffmpeg и соберёт sacd_extract."
+    elif sys.platform == "win32":
+        hint = "Выполните scripts/install-windows.ps1 — скрипт поставит ffmpeg и соберёт sacd_extract."
     else:
         hint = "Соберите extractor скриптом scripts/build-sacd-extract.sh и поставьте ffmpeg."
     return {

@@ -4,5 +4,7 @@ __pycache__/
 build/
 dist/
 bin/sacd_extract
+bin/sacd_extract.exe
+bin/*.dll
 node_modules/
 .DS_Store

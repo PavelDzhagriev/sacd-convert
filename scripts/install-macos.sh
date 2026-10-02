@@ -3,7 +3,15 @@
 set -euo pipefail
 
 if [[ "$(uname -s)" != "Darwin" ]]; then
-  echo "Это установщик для macOS. На Linux соберите extractor: scripts/build-sacd-extract.sh" >&2
+  echo "Это установщик для macOS." >&2
+  case "$(uname -s)" in
+    MINGW*|MSYS*|CYGWIN*)
+      echo "На Windows: powershell -ExecutionPolicy Bypass -File scripts/install-windows.ps1" >&2
+      ;;
+    *)
+      echo "На Linux соберите extractor: scripts/build-sacd-extract.sh" >&2
+      ;;
+  esac
   exit 1
 fi
 
