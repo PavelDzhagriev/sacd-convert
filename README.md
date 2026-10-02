@@ -1,70 +1,74 @@
-# Кедр
+# Kedr
 
-Настольная утилита: SACD ISO (DSD) и файлы DSF → PCM FLAC или MP3.
+Desktop app that converts a Super Audio CD ISO (DSD) or a DSF file into PCM FLAC or MP3.
 
-Образ Super Audio CD хранит однобитный DSD, часто ещё и сжатый в DST. Ни FLAC, ни MP3 так не умеют: оба хранят PCM. Кедр читает оглавление, снимает DST и пишет выбранный формат с тегами из диска. Окно — Electron, преобразование делает локальный Python.
+![Kedr window](docs/window.png)
 
-## Что нужно
+A Super Audio CD image stores one-bit DSD, often still packed as DST. FLAC and MP3 store PCM. Kedr reads the table of contents, decodes DST, and writes the format you pick, with tags taken from the disc. The window is Electron. Conversion stays on the machine and is done by Python.
 
-- macOS 11 или новее, либо Windows 10/11 (на Linux работает окно Electron и команда `python3 -m kedr`)
-- На Mac — [Homebrew](https://brew.sh). На Windows — winget, он уже есть в системе
-- Python 3.9+, Node.js, ffmpeg и `sacd_extract`
+## Requirements
 
-`sacd_extract` — отдельная программа из [sacd-ripper](https://github.com/sacd-ripper/sacd-ripper) (GPL-2.0). Обычный ffmpeg образ SACD не открывает. Код Кедра — MIT, extractor при установке скачивается и собирается отдельно.
+- macOS 11 or newer, or Windows 10/11. On Linux the Electron window and `python3 -m kedr` work as well.
+- On a Mac, [Homebrew](https://brew.sh). On Windows, winget, which is already part of the system.
+- Python 3.9+, Node.js, ffmpeg, and `sacd_extract`.
 
-## Установка на Mac
+`sacd_extract` is a separate program from [sacd-ripper](https://github.com/sacd-ripper/sacd-ripper) (GPL-2.0). A SACD image needs that tool. ffmpeg does not open it. Kedr itself is MIT. The installer downloads the extractor and builds it separately.
 
-Из папки с этим файлом:
+## Install on a Mac
+
+From the folder that contains this file:
 
 ```bash
 ./scripts/install-macos.sh
 open ~/Applications/Kedr.app
 ```
 
-Скрипт ставит `cmake`, `pkgconf`, `libxml2`, `ffmpeg`, Python и Node, собирает `sacd_extract`, ставит Electron и кладёт ярлык «Кедр» в `~/Applications`. `libxml2` в Homebrew спрятана от системных заголовков, скрипт сам подставляет её путь. Окно открывает локальную страницу. В интернет альбом не уходит.
+The script installs `cmake`, `pkgconf`, `libxml2`, `ffmpeg`, Python, and Node, builds `sacd_extract`, installs Electron, and puts a Kedr shortcut in `~/Applications`. Homebrew keeps `libxml2` away from the system headers, and the script passes that path itself. The window opens a local page. The album stays on the machine.
 
-Повторный запуск скрипта обновляет ярлык после изменений в этой папке.
+Run the script again after you change this folder. It refreshes the shortcut.
 
-## Установка на Windows
+## Install on Windows
 
-В PowerShell, из папки с этим файлом. Для MSYS2 в `C:\msys64` обычно нужны права администратора:
+In PowerShell, from the folder that contains this file. MSYS2 goes into `C:\msys64`, which usually needs an administrator:
 
 ```powershell
 powershell -ExecutionPolicy Bypass -File .\scripts\install-windows.ps1
 ```
 
-Скрипт через winget ставит MSYS2, Python, Node и ffmpeg, в UCRT64 собирает `sacd_extract.exe` (DLL ложатся рядом с ним), ставит Electron и кладёт ярлык «Кедр» на рабочий стол. Ярлык — `dist\Kedr.cmd`: он запускает Electron из этой папки. Подписанного установщика нет, собирать нужно на самой Windows.
+The script uses winget to install MSYS2, Python, Node, and ffmpeg, builds `sacd_extract.exe` with UCRT64 (its DLLs sit next to the executable), installs Electron, and puts a Kedr shortcut on the desktop. That shortcut is `dist\Kedr.cmd`. It starts Electron from this folder. There is no signed installer. Build it on Windows.
 
-Папку проекта после установки не переносите: ярлык указывает на неё.
+Keep the project folder where it is after installation. The shortcut points at it.
 
-Без установщика, из этой же папки:
+## Without the installer
+
+From the same folder:
 
 ```bash
 npm install
 npm start
 ```
 
-Тот же интерфейс в браузере, без Electron:
+The same page in a browser, without Electron:
 
 ```bash
 python3 -m kedr serve --open
 ```
 
-## Как пользоваться
+## How to use it
 
-1. «Выбрать файл» или вставьте путь к `.iso` / `.dsf`.
-2. «Прочитать» — появятся исполнитель, альбом и дорожки. Если на диске есть стерео и 5.1, выберите зону.
-3. Выберите FLAC или MP3.
-4. Укажите папку. Внутри неё появится каталог `Исполнитель — Альбом`.
-5. «Преобразовать в FLAC» или «Преобразовать в MP3».
+1. Choose a file, or paste a path to an `.iso` or `.dsf`.
+2. Read. The artist, album, and tracks appear. If the disc has stereo and 5.1, pick the area.
+3. Choose FLAC or MP3.
+4. Choose a folder. Inside it, Kedr creates `Artist — Album`.
+5. Convert to FLAC, or convert to MP3.
 
-FLAC по умолчанию: 176,4 кГц, 24 бит, срез шума 40 кГц, сжатие 8. Срез убирает ультразвуковой шум DSD. 352,8 кГц — без дополнительного понижения частоты, файлы заметно больше.
+FLAC defaults: 176.4 kHz, 24-bit, 40 kHz lowpass, compression 8. The lowpass removes the ultrasonic noise of DSD. 352.8 kHz skips the extra downsampling, and the files are much larger.
 
-MP3 по умолчанию: LAME, 320 кбит/с, 44,1 кГц, срез 20 кГц. MPEG не хранит частоту выше 48 кГц и не хранит 5.1 — для многоканальной зоны остаётся FLAC.
+MP3 defaults: LAME, 320 kbps, 44.1 kHz, 20 kHz lowpass. MPEG stores 44.1 or 48 kHz, and mono or stereo only. A multichannel area stays FLAC.
 
-Промежуточные DSF удаляются. Если остановить задачу, уже записанные файлы остаются.
+Temporary DSF files are deleted. If you stop a job, files already written stay.
 
-## Командная строка
+## Command line
 
 ```bash
 python3 -m kedr serve --open
@@ -75,22 +79,22 @@ python3 -m kedr convert "/path/Album.iso" -o ~/Music --mode multi --tracks 1,2,4
 python3 -m kedr tools
 ```
 
-`--mode multi` — многоканальная зона, если она есть на диске. Для MP3 она отклоняется: у MP3 только моно и стерео.
+`--mode multi` selects the multichannel area, when the disc has one. MP3 refuses that area, because MP3 holds mono and stereo only.
 
-`npm start` открывает настольное окно. `python3 -m kedr` без команды поднимает ту же страницу в браузере.
+`npm start` opens the desktop window. `python3 -m kedr` with no command opens the same page in a browser.
 
-## Проверка
+## Tests
 
 ```bash
 python3 -m unittest discover -s tests
 ```
 
-Тесты гоняют синтетический тон 440 Гц в FLAC и MP3. Полный SACD ISO в репозиторий не входит: это чужие записи.
+The tests convert a synthetic 440 Hz tone to FLAC and MP3. A full SACD ISO is not in the repository. Those files are someone else's recordings.
 
-## Ограничения
+## Limits
 
-- Результат — PCM, не «бит-в-бит» DSD. Иначе это был бы DSF.
-- Нужен целый образ SACD, не DVD-Audio и не обычный CD ISO.
-- MP3 не бывает многоканальным и не бывает выше 48 кГц. Для 5.1 нужен FLAC.
-- Многоканальный FLAC воспроизводят не все плееры.
-- Подписанного приложения с вложенным Electron здесь нет. На Mac `scripts/install-macos.sh` и на Windows `scripts/install-windows.ps1` ставят Electron в папку проекта и запускают его из ярлыка.
+- The result is PCM. Bit-perfect DSD stays a DSF file.
+- Kedr reads a complete Super Audio CD image.
+- MP3 is mono or stereo, at 44.1 or 48 kHz. 5.1 stays FLAC.
+- Many players play only stereo FLAC.
+- There is no signed bundle with Electron inside. On a Mac, `scripts/install-macos.sh` installs Electron into the project folder and launches it from the shortcut. On Windows, `scripts/install-windows.ps1` does the same.
